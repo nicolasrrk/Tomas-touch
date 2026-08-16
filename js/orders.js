@@ -1,9 +1,10 @@
 // ── Módulo Órdenes de reparación ────────────────────────────────
 import { supabase } from './supabaseClient.js';
 import { BUCKET_ORDERS } from './config.js';
-import { $M, $D, esc, toast, openModal, closeModal, skeletonCards, errorState, confirmDialog } from './ui.js';
+import { $M, $D, esc, toast, openModal, closeModal, skeletonCards, errorState, confirmDialog, groupByMonth } from './ui.js';
 import { uploadPhoto, listPhotos, deletePhoto } from './storage.js';
 import { icon } from './icons.js';
+import { cajaPush, deleteMovementsBySource } from './caja.js';
 
 const SL = { ingresado: 'Ingresado', en_proceso: 'En proceso', terminado: 'Terminado', entregado: 'Entregado' };
 const SO = ['ingresado', 'en_proceso', 'terminado', 'entregado'];
@@ -37,7 +38,9 @@ export async function renderOrders() {
     <div class="stat"><div class="stat-val" style="color:var(--primary)">${c.en_proceso}</div><div class="stat-lbl">En proceso</div></div>
     <div class="stat"><div class="stat-val t-success">${c.terminado}</div><div class="stat-lbl">Terminados</div></div>`;
 
-  list.innerHTML = filtered.length ? filtered.map(o => `
+  list.innerHTML = filtered.length ? groupByMonth(filtered, 'created_at', o => {
+    const owed = Number(o.cost || 0) - Number(o.deposit || 0);
+    return `
     <div class="card" onclick="TS.viewOrder('${o.id}')">
       <div class="card-header">
         <div style="min-width:0">
@@ -49,8 +52,12 @@ export async function renderOrders() {
       <div style="font-size:.78rem;color:var(--muted);margin-top:7px">
         ${icon('calendar', { size: 13 })} ${$D(o.created_at)}&nbsp;·&nbsp;${o.problem ? icon('chat', { size: 13 }) + ' ' + esc(o.problem.slice(0, 38)) + (o.problem.length > 38 ? '…' : '') : 'Sin descripción'}
       </div>
-      ${o.cost ? `<div class="t-success fw-700" style="margin-top:6px">${$M(o.cost)}</div>` : ''}
-    </div>`).join('')
+      <div class="row" style="margin-top:6px;gap:10px">
+        ${o.cost ? `<div class="t-success fw-700">${$M(o.cost)}</div>` : ''}
+        ${owed > 0 ? `<div class="t-muted" style="font-size:.75rem">Debe ${$M(owed)}</div>` : (o.cost ? `<div class="t-muted" style="font-size:.75rem">Pagado</div>` : '')}
+      </div>
+    </div>`;
+  })
     : `<div class="empty"><div class="empty-ico">${icon('clipboard', { size: 40 })}</div>No hay órdenes aún<br><span class="t-muted" style="font-size:.8rem">Tocá + para crear una</span></div>`;
 }
 
@@ -98,6 +105,7 @@ export async function viewOrder(id) {
   ]);
   if (error || !o) { document.getElementById('modalBody').innerHTML = `<div class="modal-title">Orden no encontrada</div>`; return; }
   const works = o.order_works || [];
+  const owed = Number(o.cost || 0) - Number(o.deposit || 0);
 
   document.getElementById('modalBody').innerHTML = `
     <div class="modal-title">${icon('device', { size: 19 })} ${esc(o.device)}</div>
@@ -127,6 +135,20 @@ export async function viewOrder(id) {
       <button class="btn btn-ghost btn-sm" onclick="TS.updateCost('${o.id}')">Actualizar</button>
     </div>
 
+    <div class="sec-title">Cobro</div>
+    <div class="cost-breakdown">
+      <div class="cb-row"><span>Abono / seña recibida</span><span>${$M(o.deposit)}</span></div>
+      <div class="cb-row cb-profit ${owed > 0 ? 'cb-neg' : 'cb-pos'}">
+        <span>${owed > 0 ? 'Saldo pendiente' : 'Pagado completo'}</span>
+        <span>${owed > 0 ? $M(owed) : icon('checkCircle', { size: 18 })}</span>
+      </div>
+    </div>
+    <div class="row mt-8">
+      <label class="sr-only" for="new-deposit">Actualizar abono</label>
+      <input id="new-deposit" type="number" inputmode="decimal" placeholder="Actualizar abono / entrega ($)" style="flex:1">
+      <button class="btn btn-ghost btn-sm" onclick="TS.updateDeposit('${o.id}')">Actualizar</button>
+    </div>
+
     <div class="sec-title">Fotos del equipo</div>
     <div class="photo-grid" id="pgrid">${photos.map((p, i) => `<div class="photo-wrap"><img src="${p.url}" alt="Foto del equipo ${i + 1}" loading="lazy"><button class="photo-del" onclick="TS.delPhoto('${o.id}','${p.path}')" aria-label="Eliminar foto ${i + 1}">${icon('close', { size: 13 })}</button></div>`).join('')}</div>
     <input type="file" id="pi" accept="image/*" multiple style="display:none" onchange="TS.addPhotos('${o.id}')">
@@ -144,7 +166,9 @@ function renderWorks(works) {
 }
 
 export async function setStatus(id, s) {
-  const { error } = await supabase.from('orders').update({ status: s }).eq('id', id);
+  const payload = { status: s };
+  if (s === 'entregado') payload.delivered_at = new Date().toISOString();
+  const { error } = await supabase.from('orders').update(payload).eq('id', id);
   if (error) { toast('No se pudo actualizar el estado', 'danger'); return; }
   toast(`Estado: ${SL[s]}`, 'success');
   viewOrder(id); renderOrders();
@@ -174,6 +198,21 @@ export async function updateCost(id) {
   viewOrder(id); renderOrders();
 }
 
+// El abono queda enlazado a Caja: cada aumento genera una entrada, cada
+// reducción (ajuste o devolución) genera una salida — igual que repuestos.
+export async function updateDeposit(id) {
+  const v = parseFloat(document.getElementById('new-deposit').value);
+  if (isNaN(v) || v < 0) return;
+  const { data: cur } = await supabase.from('orders').select('deposit, device').eq('id', id).single();
+  const diff = v - Number(cur?.deposit || 0);
+  const { error } = await supabase.from('orders').update({ deposit: v }).eq('id', id);
+  if (error) { toast('No se pudo actualizar el abono', 'danger'); return; }
+  if (diff > 0) await cajaPush('entrada', `Abono orden: ${cur.device}`, diff, 'order_deposit', id);
+  else if (diff < 0) await cajaPush('salida', `Ajuste de abono: ${cur.device}`, -diff, 'order_deposit', id);
+  toast('Abono actualizado', 'success');
+  viewOrder(id); renderOrders();
+}
+
 export async function addPhotos(id) {
   const files = document.getElementById('pi').files;
   if (!files.length) return;
@@ -196,6 +235,7 @@ export async function delOrder(id) {
     const photos = await listPhotos(BUCKET_ORDERS, id);
     await Promise.all(photos.map(p => deletePhoto(BUCKET_ORDERS, p.path)));
   } catch (e) { /* continuar igual con el borrado del registro */ }
+  try { await deleteMovementsBySource('order_deposit', id); } catch (e) { /* continuar */ }
   const { error } = await supabase.from('orders').delete().eq('id', id);
   if (error) { toast('No se pudo eliminar la orden', 'danger'); return; }
   toast('Orden eliminada', 'success');

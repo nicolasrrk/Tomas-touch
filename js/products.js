@@ -62,6 +62,7 @@ export async function renderProducts() {
         <span class="badge badge-${p.status}">${label[p.status]}</span>
       </div>
       ${p.status === 'vendido' ? `<div class="t-success" style="font-size:.82rem;margin-top:6px">Ganancia: ${$M(Number(p.sell_price) - totalCost(p))}</div>` : ''}
+      ${(() => { const owed = Number(p.sell_price || 0) - Number(p.deposit || 0); return owed > 0 && Number(p.sell_price) > 0 ? `<div class="t-muted" style="font-size:.75rem;margin-top:2px">Debe ${$M(owed)}</div>` : ''; })()}
       <div class="t-muted" style="font-size:.75rem;margin-top:4px">${$D(p.created_at)}</div>
     </div>`;
   }).join('')
@@ -139,6 +140,14 @@ export async function viewProduct(id) {
 
     ${renderBreakdown(p, costs)}
 
+    <div class="sec-title">Cobro al cliente</div>
+    ${renderDepositBlock(p)}
+    <div class="row mt-8">
+      <label class="sr-only" for="new-deposit">Actualizar abono / entrega</label>
+      <input id="new-deposit" type="number" inputmode="decimal" placeholder="Actualizar abono / entrega ($)" style="flex:1">
+      <button class="btn btn-ghost btn-sm" onclick="TS.updateProductDeposit('${p.id}')">Actualizar</button>
+    </div>
+
     <div class="sec-title">Fotos</div>
     <div class="photo-grid" id="upgrid">${photos.map((ph, i) => `<div class="photo-wrap"><img src="${ph.url}" alt="Foto ${i + 1}" loading="lazy"><button class="photo-del" onclick="TS.delProductPhoto('${p.id}','${ph.path}')" aria-label="Eliminar foto ${i + 1}">${icon('close', { size: 13 })}</button></div>`).join('')}</div>
     <input type="file" id="upi" accept="image/*" multiple style="display:none" onchange="TS.addProductPhotos('${p.id}')">
@@ -177,6 +186,33 @@ function renderBreakdown(p, costs) {
     </div>`;
 }
 
+function renderDepositBlock(p) {
+  const owed = Number(p.sell_price || 0) - Number(p.deposit || 0);
+  return `
+    <div class="cost-breakdown">
+      <div class="cb-row"><span>Abono / entrega recibida</span><span>${$M(p.deposit)}</span></div>
+      <div class="cb-row cb-profit ${owed > 0 ? 'cb-neg' : 'cb-pos'}">
+        <span>${owed > 0 ? 'Saldo pendiente' : 'Pagado completo'}</span>
+        <span>${owed > 0 ? $M(owed) : icon('checkCircle', { size: 18 })}</span>
+      </div>
+    </div>`;
+}
+
+// Enlazado a Caja igual que los repuestos: cada cambio en el abono mueve
+// la diferencia (entrada si aumenta, salida si se ajusta/devuelve).
+export async function updateProductDeposit(id) {
+  const v = parseFloat(document.getElementById('new-deposit').value);
+  if (isNaN(v) || v < 0) return;
+  const { data: cur } = await supabase.from('products').select('deposit, device').eq('id', id).single();
+  const diff = v - Number(cur?.deposit || 0);
+  const { error } = await supabase.from('products').update({ deposit: v }).eq('id', id);
+  if (error) { toast('No se pudo actualizar el abono', 'danger'); return; }
+  if (diff > 0) await cajaPush('entrada', `Abono equipo: ${cur.device}`, diff, 'product_deposit', id);
+  else if (diff < 0) await cajaPush('salida', `Ajuste de abono: ${cur.device}`, -diff, 'product_deposit', id);
+  toast('Abono actualizado', 'success');
+  viewProduct(id); renderProducts();
+}
+
 export async function addProductCost(id) {
   const d = document.getElementById('c-d').value.trim();
   const a = parseFloat(document.getElementById('c-a').value) || 0;
@@ -205,9 +241,13 @@ export async function markSold(id) {
   const priceStr = await promptDialog('Precio de venta final ($):', p.sell_price || '');
   if (priceStr === null) return;
   const sell = parseFloat(priceStr) || p.sell_price;
-  const { error } = await supabase.from('products').update({ status: 'vendido', sell_price: sell }).eq('id', id);
+  // Si ya hubo abonos cargados, solo se cobra el saldo restante — el abono
+  // ya se había registrado en Caja al momento de recibirlo, no se duplica.
+  const remaining = sell - Number(p.deposit || 0);
+  const { error } = await supabase.from('products')
+    .update({ status: 'vendido', sell_price: sell, deposit: sell, sold_at: new Date().toISOString() }).eq('id', id);
   if (error) { toast('No se pudo actualizar', 'danger'); return; }
-  await cajaPush('entrada', `Venta ${p.kind}: ${p.device}`, sell, 'product_sale', id);
+  if (remaining > 0) await cajaPush('entrada', `Venta ${p.kind}: ${p.device}`, remaining, 'product_sale', id);
   toast('Marcado como vendido', 'success');
   viewProduct(id); renderProducts();
 }

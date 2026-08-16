@@ -1,6 +1,6 @@
 // ── Módulo Caja (movimientos de dinero) ─────────────────────────
 import { supabase } from './supabaseClient.js';
-import { $M, $D, esc, toast, closeModal, skeletonCards, errorState, confirmDialog } from './ui.js';
+import { $M, $D, esc, toast, closeModal, skeletonCards, errorState, confirmDialog, MONTHS_ES } from './ui.js';
 import { icon } from './icons.js';
 
 // `source`/`sourceId` son opcionales: identifican qué registro originó el
@@ -30,7 +30,7 @@ export async function deleteMovementsBySource(source, sourceId) {
 export async function deleteMovementsForProduct(productId, costIds = []) {
   const tasks = [
     supabase.from('caja_movimientos').delete()
-      .in('source', ['product_buy', 'product_sale']).eq('source_id', productId)
+      .in('source', ['product_buy', 'product_sale', 'product_deposit']).eq('source_id', productId)
   ];
   if (costIds.length) {
     tasks.push(
@@ -104,4 +104,182 @@ export async function delMov(id) {
   const { error } = await supabase.from('caja_movimientos').delete().eq('id', id);
   if (error) { toast('No se pudo eliminar', 'danger'); return; }
   renderCaja();
+}
+
+// ── Reporte mensual (dashboard en PDF) ──────────────────────────
+export async function genMonthlyReport() {
+  const val = document.getElementById('reportMonth').value; // "YYYY-MM"
+  if (!val) { toast('Elegí un mes', 'warn'); return; }
+  const [year, monthNum] = val.split('-').map(Number);
+  const monthIndex = monthNum - 1;
+  const start = new Date(year, monthIndex, 1);
+  const end = new Date(year, monthIndex + 1, 1);
+  const startIso = start.toISOString(), endIso = end.toISOString();
+
+  toast('Generando reporte…', 'info');
+
+  const [movsRes, ordersInRes, ordersDeliveredRes, productsSoldRes, allOrdersRes, allProductsRes] = await Promise.all([
+    supabase.from('caja_movimientos').select('*').gte('created_at', startIso).lt('created_at', endIso),
+    supabase.from('orders').select('id').gte('created_at', startIso).lt('created_at', endIso),
+    supabase.from('orders').select('cost').gte('delivered_at', startIso).lt('delivered_at', endIso),
+    supabase.from('products').select('*, product_costs(amount)').gte('sold_at', startIso).lt('sold_at', endIso),
+    supabase.from('orders').select('cost,deposit'),
+    supabase.from('products').select('sell_price,deposit,status')
+  ]);
+
+  const movs = movsRes.data || [];
+  const ordersIn = ordersInRes.data || [];
+  const ordersDelivered = ordersDeliveredRes.data || [];
+  const productsSold = productsSoldRes.data || [];
+  const allOrders = allOrdersRes.data || [];
+  const allProducts = allProductsRes.data || [];
+
+  if (!movs.length && !ordersIn.length && !productsSold.length) {
+    toast('No hay actividad registrada en ese mes', 'warn');
+  }
+
+  // ── Financiero (real, según lo que efectivamente pasó por Caja) ──
+  const entradas = movs.filter(x => x.type === 'entrada').reduce((s, x) => s + Number(x.amount), 0);
+  const salidas = movs.filter(x => x.type === 'salida').reduce((s, x) => s + Number(x.amount), 0);
+  const neto = entradas - salidas;
+  const bySrc = (type, sources) => movs.filter(x => x.type === type && sources.includes(x.source)).reduce((s, x) => s + Number(x.amount), 0);
+  const ingReparaciones = bySrc('entrada', ['order_deposit']);
+  const ingVentas = bySrc('entrada', ['product_sale', 'product_deposit']);
+  const ingOtros = Math.max(0, entradas - ingReparaciones - ingVentas);
+  const egCompras = bySrc('salida', ['product_buy']);
+  const egRepuestos = bySrc('salida', ['product_cost']);
+  const egOtros = Math.max(0, salidas - egCompras - egRepuestos);
+
+  // ── Operativo ─────────────────────────────────────────────────
+  const ticketProm = ordersDelivered.length ? ordersDelivered.reduce((s, o) => s + Number(o.cost || 0), 0) / ordersDelivered.length : 0;
+  const nuevosVendidos = productsSold.filter(p => p.kind === 'nuevo').length;
+  const usadosVendidos = productsSold.filter(p => p.kind === 'usado').length;
+  const gananciaVentas = productsSold.reduce((s, p) => {
+    const extra = (p.product_costs || []).reduce((a, c) => a + Number(c.amount || 0), 0);
+    return s + (Number(p.sell_price || 0) - (Number(p.buy_price || 0) + extra));
+  }, 0);
+
+  // ── Por cobrar (foto actual, no acotada al mes) ─────────────────
+  const porCobrarOrdenes = allOrders.reduce((s, o) => s + Math.max(0, Number(o.cost || 0) - Number(o.deposit || 0)), 0);
+  const porCobrarProductos = allProducts.filter(p => p.status !== 'vendido')
+    .reduce((s, p) => s + Math.max(0, Number(p.sell_price || 0) - Number(p.deposit || 0)), 0);
+
+  const topGastos = movs.filter(x => x.type === 'salida').sort((a, b) => Number(b.amount) - Number(a.amount)).slice(0, 5);
+
+  buildReportPDF({
+    year, monthIndex, entradas, salidas, neto,
+    ingReparaciones, ingVentas, ingOtros, egCompras, egRepuestos, egOtros,
+    ordenesIngresadas: ordersIn.length, ordenesEntregadas: ordersDelivered.length, ticketProm,
+    nuevosVendidos, usadosVendidos, equiposVendidos: productsSold.length, gananciaVentas,
+    porCobrarOrdenes, porCobrarProductos, topGastos
+  });
+}
+
+function buildReportPDF(r) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const W = 210, M = 20; let y = M;
+
+  // Header
+  doc.setFillColor(0, 0, 0); doc.rect(0, 0, W, 42, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(20);
+  doc.text('TOUCH SERVIS', M, 17);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+  doc.text('Reporte mensual de gestión', M, 25);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
+  doc.text(`${MONTHS_ES[r.monthIndex]} ${r.year}`, W - M, 17, { align: 'right' });
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+  doc.text('Generado ' + new Date().toLocaleDateString('es-AR'), W - M, 25, { align: 'right' });
+
+  y = 54;
+  // Resumen financiero: 3 tarjetas
+  const cardW = (W - M * 2 - 10) / 3;
+  const cards = [
+    ['INGRESOS', $M(r.entradas), [47, 123, 255]],
+    ['EGRESOS', $M(r.salidas), [15, 23, 42]],
+    [r.neto >= 0 ? 'RESULTADO NETO' : 'RESULTADO NETO (PÉRDIDA)', $M(r.neto), r.neto >= 0 ? [47, 123, 255] : [15, 23, 42]]
+  ];
+  cards.forEach((c, i) => {
+    const x = M + i * (cardW + 5);
+    doc.setFillColor(241, 245, 249); doc.roundedRect(x, y, cardW, 26, 3, 3, 'F');
+    doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
+    doc.text(c[0], x + 5, y + 9);
+    doc.setTextColor(...c[2]); doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
+    doc.text(c[1], x + 5, y + 19);
+  });
+  y += 36;
+
+  // Ingresos / Egresos por origen (2 columnas)
+  const colW = (W - M * 2 - 8) / 2;
+  const sectionHeader = (label, x, yy) => {
+    doc.setFillColor(0, 0, 0); doc.rect(x, yy, colW, 7, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+    doc.text(label, x + 4, yy + 5);
+  };
+  const kv = (label, val, x, yy) => {
+    doc.setTextColor(71, 85, 105); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+    doc.text(label, x + 4, yy);
+    doc.setTextColor(15, 23, 42); doc.setFont('helvetica', 'bold');
+    doc.text(val, x + colW - 4, yy, { align: 'right' });
+  };
+  sectionHeader('INGRESOS POR ORIGEN', M, y);
+  sectionHeader('EGRESOS POR ORIGEN', M + colW + 8, y);
+  y += 13;
+  kv('Reparaciones (abonos)', $M(r.ingReparaciones), M, y);
+  kv('Compra de equipos', $M(r.egCompras), M + colW + 8, y); y += 8;
+  kv('Venta de equipos', $M(r.ingVentas), M, y);
+  kv('Repuestos y gastos', $M(r.egRepuestos), M + colW + 8, y); y += 8;
+  kv('Otros ingresos', $M(r.ingOtros), M, y);
+  kv('Otros egresos', $M(r.egOtros), M + colW + 8, y);
+  y += 18;
+
+  // Actividad operativa
+  doc.setFillColor(0, 0, 0); doc.rect(M, y, W - M * 2, 7, 'F');
+  doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+  doc.text('ACTIVIDAD DEL MES', M + 4, y + 5);
+  y += 13;
+  const stats = [
+    ['Órdenes ingresadas', String(r.ordenesIngresadas)],
+    ['Órdenes entregadas', String(r.ordenesEntregadas)],
+    ['Ticket promedio reparación', $M(r.ticketProm)],
+    ['Equipos vendidos', `${r.equiposVendidos} (${r.nuevosVendidos} nuevos, ${r.usadosVendidos} usados)`],
+    ['Ganancia por venta de equipos', $M(r.gananciaVentas)]
+  ];
+  stats.forEach(([label, val]) => { kv(label, val, M - 4, y); y += 8; });
+  y += 6;
+
+  // Por cobrar (snapshot actual)
+  doc.setFillColor(241, 245, 249); doc.roundedRect(M, y, W - M * 2, 24, 3, 3, 'F');
+  doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
+  doc.text('CUENTAS POR COBRAR (al día de hoy)', M + 6, y + 8);
+  doc.setTextColor(15, 23, 42); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+  doc.text(`Órdenes: ${$M(r.porCobrarOrdenes)}   ·   Equipos: ${$M(r.porCobrarProductos)}`, M + 6, y + 17);
+  doc.setFont('helvetica', 'bold'); doc.setTextColor(47, 123, 255);
+  doc.text(`Total: ${$M(r.porCobrarOrdenes + r.porCobrarProductos)}`, W - M - 6, y + 17, { align: 'right' });
+  y += 32;
+
+  // Top 5 egresos
+  if (r.topGastos.length) {
+    doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+    doc.text('MAYORES EGRESOS DEL MES', M, y); y += 5;
+    doc.setFillColor(0, 0, 0); doc.rect(M, y, W - M * 2, 7, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFontSize(9);
+    doc.text('Descripción', M + 4, y + 5); doc.text('Monto', W - M - 4, y + 5, { align: 'right' }); y += 7;
+    r.topGastos.forEach((g, i) => {
+      doc.setFillColor(i % 2 ? 255 : 248, i % 2 ? 255 : 250, i % 2 ? 255 : 252);
+      doc.rect(M, y, W - M * 2, 8, 'F');
+      doc.setTextColor(15, 23, 42); doc.setFont('helvetica', 'normal');
+      doc.text(g.description, M + 4, y + 5.5);
+      doc.setTextColor(15, 23, 42); doc.setFont('helvetica', 'bold');
+      doc.text($M(g.amount), W - M - 4, y + 5.5, { align: 'right' }); y += 8;
+    });
+  }
+
+  doc.setFontSize(8); doc.setTextColor(148, 163, 184); doc.setFont('helvetica', 'normal');
+  doc.text('Touch Servis · Reporte generado automáticamente desde el panel de gestión.', W / 2, 286, { align: 'center' });
+  doc.line(M, 282, W - M, 282);
+
+  doc.save(`TouchServis_Reporte_${r.year}-${String(r.monthIndex + 1).padStart(2, '0')}.pdf`);
+  toast('Reporte generado', 'success');
 }

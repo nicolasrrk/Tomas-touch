@@ -86,6 +86,10 @@ body{
 .badge-terminado{background:var(--primary);color:#FFFFFF}
 .badge-entregado{background:#FFFFFF0F;color:var(--muted)}
 .badge-vendido{background:#FFFFFF0F;color:var(--muted)}
+.badge-pendiente{background:var(--primary-soft-bg);color:var(--primary-bright)}
+.badge-enviado{background:var(--primary-mid-bg);color:#CFE3FF}
+.badge-aceptado{background:var(--primary);color:#FFFFFF}
+.badge-rechazado{background:#FFFFFF0F;color:var(--muted)}
 
 /* ── Stats ────────────────────────────────────────────────────── */
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
@@ -168,6 +172,21 @@ select option{background:var(--card-solid)}
 
 /* ── Section title ────────────────────────────────────────────── */
 .sec-title{font-size:0.73rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 8px}
+
+/* ── Encabezado de mes (Órdenes / Presupuestos agrupados) ────────── */
+.month-header{
+  font-size:.72rem;font-weight:800;color:var(--primary-bright);text-transform:uppercase;letter-spacing:.08em;
+  margin:18px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--border-solid);
+}
+.month-header:first-child{margin-top:0}
+
+/* ── Barra del reporte mensual (Caja) ─────────────────────────── */
+.report-bar{display:flex;gap:8px;align-items:center;margin-bottom:14px}
+.report-bar input[type="month"]{
+  flex:1;background:var(--card2);border:1px solid var(--border-solid);border-radius:8px;
+  padding:9px 10px;color:var(--text);font-size:.85rem;color-scheme:dark;
+}
+.report-bar .btn{flex-shrink:0}
 
 /* ── Desglose de rentabilidad (Nuevos/Usados) ────────────────────
    Compra + repuestos → costo total → ganancia real, de un vistazo. */

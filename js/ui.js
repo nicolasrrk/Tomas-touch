@@ -113,13 +113,31 @@ export function initDialogs() {
     if (e.key === 'Escape' && els.overlay.classList.contains('open')) settleDialog(els.inputWrap.style.display !== 'none' ? null : false);
   });
 }
-/** Reemplaza confirm(). Devuelve una Promise<boolean>. */
-export function confirmDialog(message, okLabel = 'Eliminar') {
-  return openDialog({ message, danger: true, okLabel, withInput: false });
+/** Reemplaza confirm(). Devuelve una Promise<boolean>. `danger` colorea el botón OK. */
+export function confirmDialog(message, okLabel = 'Eliminar', danger = true) {
+  return openDialog({ message, danger, okLabel, withInput: false });
 }
 /** Reemplaza prompt(). Devuelve una Promise<string|null>. */
 export function promptDialog(message, inputValue = '') {
   return openDialog({ message, danger: false, okLabel: 'Guardar', withInput: true, inputValue });
+}
+
+// ── Agrupar listas por mes (Órdenes, Presupuestos) ──────────────
+export const MONTHS_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+/** items ya ordenados desc por fecha. dateKey: nombre del campo de fecha. */
+export function groupByMonth(items, dateKey, renderItem) {
+  let html = '', currentKey = null;
+  for (const item of items) {
+    const d = new Date(item[dateKey]);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    if (key !== currentKey) {
+      currentKey = key;
+      html += `<div class="month-header">${MONTHS_ES[d.getMonth()]} ${d.getFullYear()}</div>`;
+    }
+    html += renderItem(item);
+  }
+  return html;
 }
 
 // ── Loading skeletons ────────────────────────────────────────────

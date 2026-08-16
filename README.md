@@ -13,9 +13,10 @@ js/
   auth.js             → login/logout, sesión
   ui.js               → helpers: toasts, modal, formato de moneda/fecha, skeletons
   storage.js           → subir/listar/borrar fotos (URLs firmadas, buckets privados)
-  orders.js            → módulo Órdenes (incluye generación de PDF)
-  products.js          → módulo Nuevos/Usados (equipos)
-  caja.js               → módulo Caja (movimientos de dinero)
+  orders.js            → módulo Órdenes: trabajos, abono/saldo, agrupado por mes, PDF
+  quotes.js             → módulo Presupuestos: ítems, PDF, "Convertir a Orden"
+  products.js          → módulo Nuevos/Usados: repuestos/gastos, abono/saldo, desglose de rentabilidad
+  caja.js               → módulo Caja: movimientos, reporte mensual en PDF
   main.js                → router, wiring de eventos, arranque
 legacy/
   touch-servis-localstorage.html → versión anterior (localStorage, sin login, un solo archivo). Se deja como referencia, no se usa más.
@@ -25,7 +26,8 @@ legacy/
 
 Proyecto: **touch-servis** (org "Touch Servis", plan Free, región sa-east-1).
 
-- **Tablas**: `orders`, `order_works`, `products` (columna `kind`: `nuevo`/`usado`), `product_costs` (repuestos/gastos aplicados a un equipo), `caja_movimientos`, `settings` (vacía, para configuración futura).
+- **Tablas**: `orders` (con `deposit`/`delivered_at`), `order_works`, `quotes` + `quote_items` (presupuestos), `products` (columna `kind`: `nuevo`/`usado`, con `deposit`/`sold_at`), `product_costs` (repuestos/gastos aplicados a un equipo), `caja_movimientos` (con `source`/`source_id` para enlazar movimientos con su origen), `settings` (vacía, para configuración futura).
+- **Triggers**: el total de `orders` y `quotes` se recalcula solo en la base (suma de `order_works`/`quote_items`) — no hay que pedirlo ni recalcularlo desde el cliente.
 - **Storage**: buckets privados `order-photos` y `product-photos`, organizados en carpetas por `id` del registro. Las imágenes se muestran con **URLs firmadas** de 1 hora (se regeneran cada vez que se abre el detalle).
 - **RLS (Row Level Security)**: todas las tablas y buckets solo permiten lectura/escritura a usuarios **autenticados**. No hay acceso público — toda la app queda detrás del login.
 - La `publishable key` en `js/config.js` está pensada para ser pública (va en el código del sitio); la seguridad real la da RLS, no el secreto de esa clave. **Nunca** pongas ahí la `service_role key`.
@@ -64,9 +66,10 @@ No hace falta ningún paso de build: es HTML/CSS/JS plano.
 Estructura pensada para crecer sin reescribir nada:
 
 - **Roles**: hoy cualquier usuario autenticado tiene acceso total (pensado para un solo admin). Si sumás empleados con permisos distintos, se puede agregar una tabla `profiles` con `role` y ajustar las políticas RLS por rol.
-- **Notificaciones al cliente**: la tabla `orders` ya tiene `phone` — se podría integrar WhatsApp/SMS cuando cambia el `status` (vía una Supabase Edge Function).
-- **Reportes**: `caja_movimientos` y `products` tienen todo lo necesario para armar un dashboard de rentabilidad mensual (Chart.js, por ejemplo).
+- **Notificaciones al cliente**: la tabla `orders` ya tiene `phone` — se podría integrar WhatsApp/SMS cuando cambia el `status` o cuando se genera un presupuesto (vía una Supabase Edge Function).
+- **Enviar presupuesto por WhatsApp**: hoy "Generar PDF" descarga el archivo; se podría agregar un botón que abra `wa.me` con el PDF adjunto o un link.
 - **Catálogo público**: si en algún momento querés que los clientes vean los equipos `disponible` sin login, se puede agregar una policy de `SELECT` pública solo para `products` con `status = 'disponible'`, sin tocar el resto del esquema.
-- **Búsqueda en Caja/Nuevos-Usados**: hoy solo Órdenes tiene buscador; el patrón ya está armado en `orders.js` para copiarlo a los otros módulos.
+- **Búsqueda en Caja**: Órdenes, Presupuestos y Nuevos/Usados ya tienen buscador; Caja todavía no — el patrón ya está armado para copiarlo.
+- **Cobro automático al entregar**: hoy el abono de una orden se actualiza a mano; se podría ofrecer "completar el saldo" con un solo botón al marcar `entregado`, igual que ya hace "Marcar vendido" en Nuevos/Usados.
 - **Tabla `settings`**: ya existe vacía en la base — pensada para una futura pantalla de configuración (nombre del negocio, teléfono de contacto, logo, etc.) sin tener que migrar el esquema.
 - **PWA**: agregar un `manifest.json` + service worker para poder "instalar" la app en el celular y tener soporte offline básico.

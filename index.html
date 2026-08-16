@@ -48,13 +48,30 @@
   <div class="main">
     <!-- ÓRDENES -->
     <div class="page active" id="page-orders">
-      <div class="stats" id="statsOrders"></div>
-      <div class="search-wrap">
-        <svg class="icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
-        <label for="searchOrders" class="sr-only">Buscar cliente o dispositivo</label>
-        <input class="search-bar" placeholder="Buscar cliente o dispositivo…" id="searchOrders">
+      <div class="subtabs" role="tablist" aria-label="Órdenes o presupuestos">
+        <button type="button" class="subtab active" data-otab="ordenes" role="tab" aria-selected="true" onclick="TS.setOrdersTab('ordenes')">Órdenes</button>
+        <button type="button" class="subtab" data-otab="presupuestos" role="tab" aria-selected="false" onclick="TS.setOrdersTab('presupuestos')">Presupuestos</button>
       </div>
-      <div id="listOrders"></div>
+
+      <div id="ordersView">
+        <div class="stats" id="statsOrders"></div>
+        <div class="search-wrap">
+          <svg class="icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
+          <label for="searchOrders" class="sr-only">Buscar cliente o dispositivo</label>
+          <input class="search-bar" placeholder="Buscar cliente o dispositivo…" id="searchOrders">
+        </div>
+        <div id="listOrders"></div>
+      </div>
+
+      <div id="quotesView" style="display:none">
+        <div class="stats" id="statsQuotes"></div>
+        <div class="search-wrap">
+          <svg class="icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
+          <label for="searchQuotes" class="sr-only">Buscar cliente o dispositivo</label>
+          <input class="search-bar" placeholder="Buscar cliente o dispositivo…" id="searchQuotes">
+        </div>
+        <div id="listQuotes"></div>
+      </div>
     </div>
 
     <!-- NUEVOS / USADOS -->
@@ -71,6 +88,11 @@
     <div class="page" id="page-caja">
       <div id="cajaBalance"></div>
       <div class="stats" id="statsCaja"></div>
+      <div class="report-bar">
+        <label class="sr-only" for="reportMonth">Mes del reporte</label>
+        <input type="month" id="reportMonth">
+        <button class="btn btn-ghost btn-sm" onclick="TS.genMonthlyReport()">Reporte mensual (PDF)</button>
+      </div>
       <div id="listCaja"></div>
     </div>
   </div>
