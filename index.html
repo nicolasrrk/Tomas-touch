@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Touch Servis</title>
+<meta name="description" content="Gestión interna de Touch Servis: órdenes de reparación, equipos nuevos/usados y caja.">
+<link rel="stylesheet" href="css/styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ── LOGIN ─────────────────────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">Touch Servis</div>
+    <div class="login-sub">Acceso exclusivo para administración</div>
+    <form id="login-form" novalidate>
+      <div class="form-group">
+        <label for="login-email">Email</label>
+        <input id="login-email" type="email" autocomplete="username" required placeholder="admin@ejemplo.com">
+      </div>
+      <div class="form-group">
+        <label for="login-password">Contraseña</label>
+        <input id="login-password" type="password" autocomplete="current-password" required placeholder="••••••••">
+      </div>
+      <button class="btn btn-primary btn-full mt-12" type="submit" id="login-submit">Ingresar</button>
+    </form>
+  </div>
+</div>
+
+<!-- ── APP ───────────────────────────────────────────────────── -->
+<div id="app-shell" style="display:none">
+
+  <div class="header">
+    <div>
+      <h1>Touch Servis</h1>
+      <div class="header-sub" id="headerSub">Servicio Técnico</div>
+    </div>
+    <div class="header-right">
+      <span class="admin-email" id="admin-email"></span>
+      <button class="icon-btn" onclick="TS.logout()" aria-label="Cerrar sesión" title="Cerrar sesión">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- ÓRDENES -->
+    <div class="page active" id="page-orders">
+      <div class="stats" id="statsOrders"></div>
+      <div class="search-wrap">
+        <svg class="icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
+        <label for="searchOrders" class="sr-only">Buscar cliente o dispositivo</label>
+        <input class="search-bar" placeholder="Buscar cliente o dispositivo…" id="searchOrders">
+      </div>
+      <div id="listOrders"></div>
+    </div>
+
+    <!-- NUEVOS / USADOS -->
+    <div class="page" id="page-usados">
+      <div class="subtabs" role="tablist" aria-label="Tipo de equipo">
+        <button type="button" class="subtab" data-kind="nuevo" role="tab" aria-selected="false" onclick="TS.setKind('nuevo')">Nuevos</button>
+        <button type="button" class="subtab active" data-kind="usado" role="tab" aria-selected="true" onclick="TS.setKind('usado')">Usados</button>
+      </div>
+      <div class="stats" id="statsUsados"></div>
+      <div id="listUsados"></div>
+    </div>
+
+    <!-- CAJA -->
+    <div class="page" id="page-caja">
+      <div id="cajaBalance"></div>
+      <div class="stats" id="statsCaja"></div>
+      <div id="listCaja"></div>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <button class="nav-item active" onclick="TS.goTo('orders')" id="nav-orders" aria-current="page">
+      <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      Órdenes
+    </button>
+    <button class="nav-item" onclick="TS.goTo('usados')" id="nav-usados">
+      <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+      Nuevos/Usados
+    </button>
+    <button class="nav-item" onclick="TS.goTo('caja')" id="nav-caja">
+      <svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      Caja
+    </button>
+  </nav>
+
+  <button class="fab" id="fab" onclick="TS.handleFab()" aria-label="Nueva orden">+</button>
+
+  <!-- Modal -->
+  <div class="overlay" id="overlay" onclick="TS.maybeClose(event)">
+    <div class="modal" id="modal" tabindex="-1">
+      <div class="modal-topbar">
+        <button class="modal-close" onclick="TS.closeModal()" aria-label="Cerrar">
+          <svg class="icon" aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <!-- Diálogo de confirmación / prompt (reemplaza confirm()/prompt() nativos) -->
+  <div class="overlay confirm-overlay" id="confirmOverlay">
+    <div class="modal confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="confirmMsg">
+      <p id="confirmMsg"></p>
+      <div class="form-group" id="confirmInputWrap" style="display:none">
+        <label for="confirmInput" class="sr-only">Valor</label>
+        <input id="confirmInput" type="number" inputmode="decimal">
+      </div>
+      <div class="row-wrap mt-16" style="justify-content:flex-end">
+        <button class="btn btn-ghost btn-sm" id="confirmCancel">Cancelar</button>
+        <button class="btn btn-danger btn-sm" id="confirmOk">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

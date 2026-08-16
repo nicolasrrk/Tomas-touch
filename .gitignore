@@ -1,0 +1,7 @@
+# Config y skills de Claude Code (no forman parte del sitio publicado)
+.claude/
+
+# Sistema
+.DS_Store
+Thumbs.db
+node_modules/
