@@ -1,6 +1,6 @@
 // ── Módulo Caja (movimientos de dinero) ─────────────────────────
 import { supabase } from './supabaseClient.js';
-import { $M, $D, esc, toast, closeModal, skeletonCards, errorState, confirmDialog, MONTHS_ES, animateStats } from './ui.js';
+import { $M, $D, esc, toast, closeModal, skeletonCards, errorState, confirmDialog, MONTHS_ES, animateStats, matchesMonth, refreshMonthFilterOptions } from './ui.js';
 import { icon } from './icons.js';
 
 // `source`/`sourceId` son opcionales: identifican qué registro originó el
@@ -42,6 +42,12 @@ export async function deleteMovementsForProduct(productId, costIds = []) {
   results.forEach(r => { if (r.error) console.error('deleteMovementsForProduct', r.error); });
 }
 
+let monthFilter = '';
+
+/** Cambia el mes filtrado y vuelve a renderizar. No afecta el saldo
+ *  disponible (es acumulado histórico, filtrarlo sería engañoso). */
+export function setMonthFilter(v) { monthFilter = v; renderCaja(); }
+
 export async function renderCaja() {
   const list = document.getElementById('listCaja');
   list.innerHTML = skeletonCards(3);
@@ -51,22 +57,28 @@ export async function renderCaja() {
     list.innerHTML = errorState('No se pudo cargar la caja.', 'Reintentar', 'onclick="TS.renderCaja()"');
     return;
   }
-  const ent = movs.filter(m => m.type === 'entrada').reduce((s, m) => s + Number(m.amount), 0);
-  const sal = movs.filter(m => m.type === 'salida').reduce((s, m) => s + Number(m.amount), 0);
+  // Saldo disponible: SIEMPRE sobre el histórico completo, sin filtrar.
+  const entTotal = movs.filter(m => m.type === 'entrada').reduce((s, m) => s + Number(m.amount), 0);
+  const salTotal = movs.filter(m => m.type === 'salida').reduce((s, m) => s + Number(m.amount), 0);
   const balEl = document.getElementById('cajaBalance');
   balEl.innerHTML = `
     <div class="balance-card">
       <div class="bal-label">Saldo disponible</div>
-      <div class="bal-amount" data-count="${ent - sal}" data-money="1">$0</div>
+      <div class="bal-amount" data-count="${entTotal - salTotal}" data-money="1">$0</div>
     </div>`;
   animateStats(balEl);
+
+  refreshMonthFilterOptions(document.getElementById('filterMonthCaja'), movs, 'created_at', monthFilter);
+  const scoped = movs.filter(m => matchesMonth(m, 'created_at', monthFilter));
+  const ent = scoped.filter(m => m.type === 'entrada').reduce((s, m) => s + Number(m.amount), 0);
+  const sal = scoped.filter(m => m.type === 'salida').reduce((s, m) => s + Number(m.amount), 0);
   const statsEl = document.getElementById('statsCaja');
   statsEl.innerHTML = `
     <div class="stat"><div class="stat-val t-success" style="font-size:1rem" data-count="${ent}" data-money="1">$0</div><div class="stat-lbl">Entradas</div></div>
     <div class="stat"><div class="stat-val t-danger" style="font-size:1rem" data-count="${sal}" data-money="1">$0</div><div class="stat-lbl">Salidas</div></div>
-    <div class="stat"><div class="stat-val" data-count="${movs.length}">0</div><div class="stat-lbl">Movimientos</div></div>`;
+    <div class="stat"><div class="stat-val" data-count="${scoped.length}">0</div><div class="stat-lbl">Movimientos</div></div>`;
   animateStats(statsEl);
-  list.innerHTML = movs.length ? movs.map(m => `
+  list.innerHTML = scoped.length ? scoped.map(m => `
     <div class="mov">
       <div class="mov-ico ${m.type}" aria-hidden="true">${icon(m.type === 'entrada' ? 'arrowUpRight' : 'arrowDownRight', { size: 17 })}</div>
       <div class="mov-info">

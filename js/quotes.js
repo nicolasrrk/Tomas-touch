@@ -1,9 +1,13 @@
 // ── Módulo Presupuestos ──────────────────────────────────────────
 import { supabase } from './supabaseClient.js';
-import { $M, $D, esc, toast, openModal, closeModal, skeletonCards, errorState, confirmDialog, groupByMonth, animateStats } from './ui.js';
+import { $M, $D, esc, toast, openModal, closeModal, skeletonCards, errorState, confirmDialog, groupByMonth, animateStats, matchesMonth, refreshMonthFilterOptions } from './ui.js';
 import { icon } from './icons.js';
 
 const QL = { pendiente: 'Pendiente', enviado: 'Enviado', aceptado: 'Aceptado', rechazado: 'Rechazado' };
+let monthFilter = '';
+
+/** Cambia el mes filtrado y vuelve a renderizar. */
+export function setMonthFilter(v) { monthFilter = v; renderQuotes(); }
 
 export async function renderQuotes() {
   const list = document.getElementById('listQuotes');
@@ -17,16 +21,18 @@ export async function renderQuotes() {
     list.innerHTML = errorState('No se pudieron cargar los presupuestos.', 'Reintentar', 'onclick="TS.renderQuotes()"');
     return;
   }
+  refreshMonthFilterOptions(document.getElementById('filterMonthQuotes'), quotes, 'created_at', monthFilter);
+  const scoped = quotes.filter(x => matchesMonth(x, 'created_at', monthFilter));
   const q = (document.getElementById('searchQuotes')?.value || '').toLowerCase();
-  const filtered = quotes.filter(x => !q || x.client?.toLowerCase().includes(q) || x.device?.toLowerCase().includes(q));
+  const filtered = scoped.filter(x => !q || x.client?.toLowerCase().includes(q) || x.device?.toLowerCase().includes(q));
 
-  const pend = quotes.filter(x => x.status === 'pendiente' || x.status === 'enviado').length;
-  const acep = quotes.filter(x => x.status === 'aceptado').length;
+  const pend = scoped.filter(x => x.status === 'pendiente' || x.status === 'enviado').length;
+  const acep = scoped.filter(x => x.status === 'aceptado').length;
   const statsEl = document.getElementById('statsQuotes');
   statsEl.innerHTML = `
     <div class="stat"><div class="stat-val" style="color:var(--primary-bright)" data-count="${pend}">0</div><div class="stat-lbl">Pendientes</div></div>
     <div class="stat"><div class="stat-val t-success" data-count="${acep}">0</div><div class="stat-lbl">Aceptados</div></div>
-    <div class="stat"><div class="stat-val" data-count="${quotes.length}">0</div><div class="stat-lbl">Total</div></div>`;
+    <div class="stat"><div class="stat-val" data-count="${scoped.length}">0</div><div class="stat-lbl">Total</div></div>`;
   animateStats(statsEl);
 
   list.innerHTML = filtered.length ? groupByMonth(filtered, 'created_at', p => `

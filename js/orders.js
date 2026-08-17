@@ -1,7 +1,7 @@
 // ── Módulo Órdenes de reparación ────────────────────────────────
 import { supabase } from './supabaseClient.js';
 import { BUCKET_ORDERS } from './config.js';
-import { $M, $D, esc, toast, openModal, closeModal, skeletonCards, errorState, confirmDialog, groupByMonth, animateStats } from './ui.js';
+import { $M, $D, esc, toast, openModal, closeModal, skeletonCards, errorState, confirmDialog, groupByMonth, animateStats, matchesMonth, refreshMonthFilterOptions } from './ui.js';
 import { uploadPhoto, listPhotos, deletePhoto } from './storage.js';
 import { icon } from './icons.js';
 import { cajaPush, deleteMovementsBySource } from './caja.js';
@@ -10,6 +10,10 @@ const SL = { ingresado: 'Ingresado', en_proceso: 'En proceso', terminado: 'Termi
 const SO = ['ingresado', 'en_proceso', 'terminado', 'entregado'];
 
 let cache = [];
+let monthFilter = ''; // '' = todos los meses
+
+/** Cambia el mes filtrado y vuelve a renderizar. */
+export function setMonthFilter(v) { monthFilter = v; renderOrders(); }
 
 async function fetchOrders() {
   const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
@@ -27,12 +31,14 @@ export async function renderOrders() {
     list.innerHTML = errorState('No se pudieron cargar las órdenes.', 'Reintentar', 'onclick="TS.renderOrders()"');
     return;
   }
+  refreshMonthFilterOptions(document.getElementById('filterMonthOrders'), orders, 'created_at', monthFilter);
+  const scoped = orders.filter(o => matchesMonth(o, 'created_at', monthFilter));
   const q = (document.getElementById('searchOrders')?.value || '').toLowerCase();
-  const filtered = orders.filter(o => !q ||
+  const filtered = scoped.filter(o => !q ||
     o.client?.toLowerCase().includes(q) || o.device?.toLowerCase().includes(q));
 
   const c = { ingresado: 0, en_proceso: 0, terminado: 0 };
-  orders.forEach(o => { if (c[o.status] !== undefined) c[o.status]++; });
+  scoped.forEach(o => { if (c[o.status] !== undefined) c[o.status]++; });
   const statsEl = document.getElementById('statsOrders');
   statsEl.innerHTML = `
     <div class="stat"><div class="stat-val" style="color:var(--primary-bright)" data-count="${c.ingresado}">0</div><div class="stat-lbl">Ingresados</div></div>

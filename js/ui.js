@@ -176,6 +176,34 @@ export function groupByMonth(items, dateKey, renderItem) {
   return html;
 }
 
+// ── Filtro por mes (Órdenes, Presupuestos, Nuevos/Usados, Caja) ──
+// Valor canónico "YYYY-MM" (con cero adelante) para usar en <select>.
+export function monthValueOf(dateStr) {
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** true si el item cae dentro del mes elegido, o si no hay filtro activo ('' = Todos). */
+export function matchesMonth(item, dateKey, monthFilter) {
+  return !monthFilter || monthValueOf(item[dateKey]) === monthFilter;
+}
+
+/**
+ * Reconstruye las <option> de un <select> de filtro por mes a partir del
+ * dataset ya cargado (sin pedir nada nuevo al servidor) y conserva la
+ * selección activa para que no se resetee en cada re-render.
+ */
+export function refreshMonthFilterOptions(selectEl, items, dateKey, currentValue) {
+  if (!selectEl) return;
+  const months = [...new Set(items.map(x => monthValueOf(x[dateKey])))].sort().reverse();
+  selectEl.innerHTML = '<option value="">Todos los meses</option>' +
+    months.map(m => {
+      const [y, mm] = m.split('-').map(Number);
+      return `<option value="${m}">${MONTHS_ES[mm - 1]} ${y}</option>`;
+    }).join('');
+  selectEl.value = months.includes(currentValue) ? currentValue : '';
+}
+
 // ── Loading skeletons ────────────────────────────────────────────
 export function skeletonCards(n = 3) {
   return Array.from({ length: n }).map(() => `

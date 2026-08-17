@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Touch Servis</title>
 <meta name="description" content="Gestión interna de Touch Servis: órdenes de reparación, equipos nuevos/usados y caja.">
+<meta name="theme-color" content="#000000">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='rgb(10,15,26)'/%3E%3Cpath d='M14.7 6.3a4 4 0 10-5.66 5.66l-6.36 6.36a1 1 0 001.42 1.42l6.36-6.36a4 4 0 005.66-5.66l-2.12 2.12-2.12-.7-.7-2.12 2.12-2.12z' fill='none' stroke='rgb(47,123,255)' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="css/styles.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
@@ -55,20 +57,28 @@
 
       <div id="ordersView">
         <div class="stats" id="statsOrders"></div>
-        <div class="search-wrap">
-          <svg class="icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
-          <label for="searchOrders" class="sr-only">Buscar cliente o dispositivo</label>
-          <input class="search-bar" placeholder="Buscar cliente o dispositivo…" id="searchOrders">
+        <div class="filter-row">
+          <div class="search-wrap">
+            <svg class="icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
+            <label for="searchOrders" class="sr-only">Buscar cliente o dispositivo</label>
+            <input class="search-bar" placeholder="Buscar cliente o dispositivo…" id="searchOrders">
+          </div>
+          <label for="filterMonthOrders" class="sr-only">Filtrar por mes</label>
+          <select id="filterMonthOrders" class="month-filter" onchange="TS.setOrdersMonthFilter(this.value)"><option value="">Todos los meses</option></select>
         </div>
         <div id="listOrders"></div>
       </div>
 
       <div id="quotesView" style="display:none">
         <div class="stats" id="statsQuotes"></div>
-        <div class="search-wrap">
-          <svg class="icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
-          <label for="searchQuotes" class="sr-only">Buscar cliente o dispositivo</label>
-          <input class="search-bar" placeholder="Buscar cliente o dispositivo…" id="searchQuotes">
+        <div class="filter-row">
+          <div class="search-wrap">
+            <svg class="icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
+            <label for="searchQuotes" class="sr-only">Buscar cliente o dispositivo</label>
+            <input class="search-bar" placeholder="Buscar cliente o dispositivo…" id="searchQuotes">
+          </div>
+          <label for="filterMonthQuotes" class="sr-only">Filtrar por mes</label>
+          <select id="filterMonthQuotes" class="month-filter" onchange="TS.setQuotesMonthFilter(this.value)"><option value="">Todos los meses</option></select>
         </div>
         <div id="listQuotes"></div>
       </div>
@@ -81,6 +91,10 @@
         <button type="button" class="subtab active" data-kind="usado" role="tab" aria-selected="true" onclick="TS.setKind('usado')">Usados</button>
       </div>
       <div class="stats" id="statsUsados"></div>
+      <div class="filter-row" style="justify-content:flex-end">
+        <label for="filterMonthProducts" class="sr-only">Filtrar por mes</label>
+        <select id="filterMonthProducts" class="month-filter" onchange="TS.setProductsMonthFilter(this.value)"><option value="">Todos los meses</option></select>
+      </div>
       <div id="listUsados"></div>
     </div>
 
@@ -92,6 +106,10 @@
         <label class="sr-only" for="reportMonth">Mes del reporte</label>
         <input type="month" id="reportMonth">
         <button class="btn btn-ghost btn-sm" onclick="TS.genMonthlyReport()">Reporte mensual (PDF)</button>
+      </div>
+      <div class="filter-row" style="justify-content:flex-end">
+        <label for="filterMonthCaja" class="sr-only">Filtrar por mes</label>
+        <select id="filterMonthCaja" class="month-filter" onchange="TS.setCajaMonthFilter(this.value)"><option value="">Todos los meses</option></select>
       </div>
       <div id="listCaja"></div>
     </div>

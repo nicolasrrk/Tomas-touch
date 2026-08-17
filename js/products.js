@@ -1,12 +1,16 @@
 // ── Módulo Nuevos / Usados (catálogo de equipos) ────────────────
 import { supabase } from './supabaseClient.js';
 import { BUCKET_PRODUCTS } from './config.js';
-import { $M, $D, esc, toast, openModal, closeModal, skeletonCards, errorState, confirmDialog, promptDialog, animateStats } from './ui.js';
+import { $M, $D, esc, toast, openModal, closeModal, skeletonCards, errorState, confirmDialog, promptDialog, animateStats, matchesMonth, refreshMonthFilterOptions } from './ui.js';
 import { uploadPhoto, listPhotos, deletePhoto } from './storage.js';
 import { cajaPush, deleteMovementsBySource, deleteMovementsForProduct } from './caja.js';
 import { icon } from './icons.js';
 
 export let currentKind = 'usado'; // sub-tab activo dentro de la página
+let monthFilter = '';
+
+/** Cambia el mes filtrado y vuelve a renderizar. */
+export function setMonthFilter(v) { monthFilter = v; renderProducts(); }
 
 export function setKind(kind) {
   currentKind = kind;
@@ -42,9 +46,11 @@ export async function renderProducts() {
     list.innerHTML = errorState('No se pudo cargar el catálogo.', 'Reintentar', 'onclick="TS.renderProducts()"');
     return;
   }
-  const disp = items.filter(x => x.status === 'disponible').length;
-  const vend = items.filter(x => x.status === 'vendido').length;
-  const ganancia = items.filter(x => x.status === 'vendido').reduce((s, x) => s + (Number(x.sell_price) - totalCost(x)), 0);
+  refreshMonthFilterOptions(document.getElementById('filterMonthProducts'), items, 'created_at', monthFilter);
+  const scoped = items.filter(x => matchesMonth(x, 'created_at', monthFilter));
+  const disp = scoped.filter(x => x.status === 'disponible').length;
+  const vend = scoped.filter(x => x.status === 'vendido').length;
+  const ganancia = scoped.filter(x => x.status === 'vendido').reduce((s, x) => s + (Number(x.sell_price) - totalCost(x)), 0);
   const statsEl = document.getElementById('statsUsados');
   statsEl.innerHTML = `
     <div class="stat"><div class="stat-val" data-count="${disp}">0</div><div class="stat-lbl">Disponibles</div></div>
@@ -52,7 +58,7 @@ export async function renderProducts() {
     <div class="stat"><div class="stat-val t-success" style="font-size:.95rem" data-count="${ganancia}" data-money="1">$0</div><div class="stat-lbl">Ganancia</div></div>`;
   animateStats(statsEl);
   const label = { disponible: 'Disponible', reservado: 'Reservado', vendido: 'Vendido' };
-  list.innerHTML = items.length ? items.map(p => {
+  list.innerHTML = scoped.length ? scoped.map(p => {
     const extra = extraCosts(p);
     return `
     <div class="card" onclick="TS.viewProduct('${p.id}')">

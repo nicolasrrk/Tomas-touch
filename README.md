@@ -1,6 +1,6 @@
 # Touch Servis
 
-App interna de gestión para el taller: **órdenes de reparación**, **equipos nuevos/usados** y **caja**. 100% estática (HTML + CSS + JS con módulos ES, sin build step) con **Supabase** como backend (base de datos, autenticación y almacenamiento de fotos). Pensada para hostear gratis en **GitHub Pages**.
+App interna de gestión para el taller: **órdenes de reparación**, **presupuestos**, **equipos nuevos/usados** y **caja**, con filtro por mes en cada sección y reporte mensual en PDF. 100% estática (HTML + CSS + JS con módulos ES, sin build step) con **Supabase** como backend (base de datos, autenticación y almacenamiento de fotos). Pensada para hostear gratis en **GitHub Pages**.
 
 ## Estructura
 
@@ -13,10 +13,11 @@ js/
   auth.js             → login/logout, sesión
   ui.js               → helpers: toasts, modal, formato de moneda/fecha, skeletons
   storage.js           → subir/listar/borrar fotos (URLs firmadas, buckets privados)
-  orders.js            → módulo Órdenes: trabajos, abono/saldo, agrupado por mes, PDF
-  quotes.js             → módulo Presupuestos: ítems, PDF, "Convertir a Orden"
-  products.js          → módulo Nuevos/Usados: repuestos/gastos, abono/saldo, desglose de rentabilidad
-  caja.js               → módulo Caja: movimientos, reporte mensual en PDF
+  orders.js            → módulo Órdenes: trabajos, abono/saldo, agrupado y filtrado por mes, PDF
+  quotes.js             → módulo Presupuestos: ítems, PDF, "Convertir a Orden", filtrado por mes
+  products.js          → módulo Nuevos/Usados: repuestos/gastos, abono/saldo, desglose de rentabilidad, filtrado por mes
+  caja.js               → módulo Caja: movimientos filtrables por mes, saldo histórico, reporte mensual en PDF
+  icons.js              → set de íconos SVG (sin emojis en toda la app)
   main.js                → router, wiring de eventos, arranque
 legacy/
   touch-servis-localstorage.html → versión anterior (localStorage, sin login, un solo archivo). Se deja como referencia, no se usa más.
@@ -48,10 +49,10 @@ Para agregar más personas con acceso (a futuro), repetís el mismo paso.
 Como usa módulos ES (`<script type="module">`), **no podés abrir `index.html` directo con doble clic** (el navegador bloquea `import` sobre `file://`). Necesitás un servidor estático simple:
 
 ```bash
-python -m http.server 8080
+python scripts/dev-server.py 8080
 ```
 
-Y abrís `http://localhost:8080`.
+Y abrís `http://localhost:8080`. (Es un `http.server` normal pero sin caché — evita ver una versión vieja de los archivos mientras estás probando cambios. También podés usar `python -m http.server 8080` si no te importa la caché.)
 
 ## Deploy a GitHub Pages
 

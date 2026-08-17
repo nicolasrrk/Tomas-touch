@@ -223,6 +223,15 @@ select option{background:var(--card-solid)}
 }
 .report-bar .btn{flex-shrink:0}
 
+/* ── Filtro por mes (Órdenes, Presupuestos, Nuevos/Usados, Caja) ── */
+.filter-row{display:flex;gap:8px;margin-bottom:12px}
+.filter-row .search-wrap{flex:1;margin-bottom:0}
+.month-filter{
+  flex-shrink:0;max-width:148px;background:var(--card2);border:1px solid var(--border-solid);
+  border-radius:8px;padding:0 10px;color:var(--text);font-size:.8rem;color-scheme:dark;cursor:pointer;
+}
+.month-filter:focus{border-color:var(--primary)}
+
 /* ── Desglose de rentabilidad (Nuevos/Usados) ────────────────────
    Compra + repuestos → costo total → ganancia real, de un vistazo. */
 .cost-breakdown{

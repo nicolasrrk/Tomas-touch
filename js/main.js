@@ -1,5 +1,5 @@
 // ── Bootstrap: auth gate + router + wiring de eventos ───────────
-import { initAuth, isLoggedIn, getSession, login, logout, onAuthChange } from './auth.js';
+import { initAuth, login, logout, onAuthChange } from './auth.js';
 import { openModal, closeModal, maybeClose, toast, initDialogs, initSpotlight } from './ui.js';
 import * as Orders from './orders.js';
 import * as Quotes from './quotes.js';
@@ -76,16 +76,18 @@ window.TS = {
   viewOrder: Orders.viewOrder, setStatus: Orders.setStatus, addWork: Orders.addWork,
   delWork: Orders.delWork, updateCost: Orders.updateCost, updateDeposit: Orders.updateDeposit,
   addPhotos: Orders.addPhotos, delPhoto: Orders.delPhoto, delOrder: Orders.delOrder, genPDF: Orders.genPDF,
-  renderOrders: Orders.renderOrders,
+  renderOrders: Orders.renderOrders, setOrdersMonthFilter: Orders.setMonthFilter,
   viewQuote: Quotes.viewQuote, addQuoteItem: Quotes.addQuoteItem, delQuoteItem: Quotes.delQuoteItem,
   markQuoteRejected: Quotes.markQuoteRejected, convertToOrder: Quotes.convertToOrder,
   delQuote: Quotes.delQuote, genQuotePDF: Quotes.genQuotePDF, renderQuotes: Quotes.renderQuotes,
+  setQuotesMonthFilter: Quotes.setMonthFilter,
   viewProduct: Products.viewProduct, markSold: Products.markSold,
   addProductPhotos: Products.addProductPhotos, delProductPhoto: Products.delProductPhoto,
   delProduct: Products.delProduct, renderProducts: Products.renderProducts, setKind: Products.setKind,
   addProductCost: Products.addProductCost, delProductCost: Products.delProductCost,
-  updateProductDeposit: Products.updateProductDeposit,
+  updateProductDeposit: Products.updateProductDeposit, setProductsMonthFilter: Products.setMonthFilter,
   delMov: Caja.delMov, renderCaja: Caja.renderCaja, genMonthlyReport: Caja.genMonthlyReport,
+  setCajaMonthFilter: Caja.setMonthFilter,
   logout: async () => { await logout(); toast('Sesión cerrada', 'info'); }
 };
 
