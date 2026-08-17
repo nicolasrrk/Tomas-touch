@@ -1,7 +1,7 @@
 // ── Módulo Nuevos / Usados (catálogo de equipos) ────────────────
 import { supabase } from './supabaseClient.js';
 import { BUCKET_PRODUCTS } from './config.js';
-import { $M, $D, esc, toast, openModal, closeModal, skeletonCards, errorState, confirmDialog, promptDialog } from './ui.js';
+import { $M, $D, esc, toast, openModal, closeModal, skeletonCards, errorState, confirmDialog, promptDialog, animateStats } from './ui.js';
 import { uploadPhoto, listPhotos, deletePhoto } from './storage.js';
 import { cajaPush, deleteMovementsBySource, deleteMovementsForProduct } from './caja.js';
 import { icon } from './icons.js';
@@ -45,10 +45,12 @@ export async function renderProducts() {
   const disp = items.filter(x => x.status === 'disponible').length;
   const vend = items.filter(x => x.status === 'vendido').length;
   const ganancia = items.filter(x => x.status === 'vendido').reduce((s, x) => s + (Number(x.sell_price) - totalCost(x)), 0);
-  document.getElementById('statsUsados').innerHTML = `
-    <div class="stat"><div class="stat-val">${disp}</div><div class="stat-lbl">Disponibles</div></div>
-    <div class="stat"><div class="stat-val">${vend}</div><div class="stat-lbl">Vendidos</div></div>
-    <div class="stat"><div class="stat-val t-success" style="font-size:.95rem">${$M(ganancia)}</div><div class="stat-lbl">Ganancia</div></div>`;
+  const statsEl = document.getElementById('statsUsados');
+  statsEl.innerHTML = `
+    <div class="stat"><div class="stat-val" data-count="${disp}">0</div><div class="stat-lbl">Disponibles</div></div>
+    <div class="stat"><div class="stat-val" data-count="${vend}">0</div><div class="stat-lbl">Vendidos</div></div>
+    <div class="stat"><div class="stat-val t-success" style="font-size:.95rem" data-count="${ganancia}" data-money="1">$0</div><div class="stat-lbl">Ganancia</div></div>`;
+  animateStats(statsEl);
   const label = { disponible: 'Disponible', reservado: 'Reservado', vendido: 'Vendido' };
   list.innerHTML = items.length ? items.map(p => {
     const extra = extraCosts(p);

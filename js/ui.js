@@ -16,6 +16,42 @@ export function esc(s) {
   }[c]));
 }
 
+// ── Spotlight: la luz sigue al cursor (elemento de firma visual) ──
+// Un único listener delegado, no depende de qué tarjetas existan en
+// cada momento (se re-renderizan todo el tiempo vía innerHTML).
+export function initSpotlight() {
+  const SEL = '.card,.stat,.cost-breakdown,.login-card,.balance-card';
+  document.addEventListener('pointermove', (e) => {
+    const el = e.target.closest(SEL);
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    el.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100) + '%');
+    el.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100) + '%');
+  }, { passive: true });
+}
+
+// ── Números que suben en vez de aparecer de golpe ────────────────
+const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** Anima todos los [data-count] dentro de container desde 0 hasta su valor. */
+export function animateStats(container) {
+  if (!container) return;
+  container.querySelectorAll('[data-count]').forEach(el => {
+    const target = Number(el.dataset.count) || 0;
+    const money = el.dataset.money === '1';
+    if (reduceMotion()) { el.textContent = money ? $M(target) : String(Math.round(target)); return; }
+    const t0 = performance.now(), dur = 700;
+    function tick(now) {
+      const p = Math.min(1, (now - t0) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);
+      const val = target * eased;
+      el.textContent = money ? $M(val) : String(Math.round(val));
+      if (p < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  });
+}
+
 // ── Toasts accesibles (reemplaza alert()) ───────────────────────
 let toastHost;
 function ensureToastHost() {

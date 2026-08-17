@@ -1,7 +1,7 @@
 // ── Módulo Órdenes de reparación ────────────────────────────────
 import { supabase } from './supabaseClient.js';
 import { BUCKET_ORDERS } from './config.js';
-import { $M, $D, esc, toast, openModal, closeModal, skeletonCards, errorState, confirmDialog, groupByMonth } from './ui.js';
+import { $M, $D, esc, toast, openModal, closeModal, skeletonCards, errorState, confirmDialog, groupByMonth, animateStats } from './ui.js';
 import { uploadPhoto, listPhotos, deletePhoto } from './storage.js';
 import { icon } from './icons.js';
 import { cajaPush, deleteMovementsBySource } from './caja.js';
@@ -33,10 +33,12 @@ export async function renderOrders() {
 
   const c = { ingresado: 0, en_proceso: 0, terminado: 0 };
   orders.forEach(o => { if (c[o.status] !== undefined) c[o.status]++; });
-  document.getElementById('statsOrders').innerHTML = `
-    <div class="stat"><div class="stat-val" style="color:var(--primary-bright)">${c.ingresado}</div><div class="stat-lbl">Ingresados</div></div>
-    <div class="stat"><div class="stat-val" style="color:var(--primary)">${c.en_proceso}</div><div class="stat-lbl">En proceso</div></div>
-    <div class="stat"><div class="stat-val t-success">${c.terminado}</div><div class="stat-lbl">Terminados</div></div>`;
+  const statsEl = document.getElementById('statsOrders');
+  statsEl.innerHTML = `
+    <div class="stat"><div class="stat-val" style="color:var(--primary-bright)" data-count="${c.ingresado}">0</div><div class="stat-lbl">Ingresados</div></div>
+    <div class="stat"><div class="stat-val" style="color:var(--primary)" data-count="${c.en_proceso}">0</div><div class="stat-lbl">En proceso</div></div>
+    <div class="stat"><div class="stat-val t-success" data-count="${c.terminado}">0</div><div class="stat-lbl">Terminados</div></div>`;
+  animateStats(statsEl);
 
   list.innerHTML = filtered.length ? groupByMonth(filtered, 'created_at', o => {
     const owed = Number(o.cost || 0) - Number(o.deposit || 0);

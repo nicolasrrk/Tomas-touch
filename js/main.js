@@ -1,6 +1,6 @@
 // ── Bootstrap: auth gate + router + wiring de eventos ───────────
 import { initAuth, isLoggedIn, getSession, login, logout, onAuthChange } from './auth.js';
-import { openModal, closeModal, maybeClose, toast, initDialogs } from './ui.js';
+import { openModal, closeModal, maybeClose, toast, initDialogs, initSpotlight } from './ui.js';
 import * as Orders from './orders.js';
 import * as Quotes from './quotes.js';
 import * as Products from './products.js';
@@ -91,6 +91,7 @@ window.TS = {
 
 // ── Init ─────────────────────────────────────────────────────
 initDialogs();
+initSpotlight();
 document.getElementById('login-form').addEventListener('submit', handleLogin);
 document.getElementById('searchOrders').addEventListener('input', () => Orders.renderOrders());
 document.getElementById('searchQuotes').addEventListener('input', () => Quotes.renderQuotes());

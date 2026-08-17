@@ -1,6 +1,6 @@
 // ── Módulo Caja (movimientos de dinero) ─────────────────────────
 import { supabase } from './supabaseClient.js';
-import { $M, $D, esc, toast, closeModal, skeletonCards, errorState, confirmDialog, MONTHS_ES } from './ui.js';
+import { $M, $D, esc, toast, closeModal, skeletonCards, errorState, confirmDialog, MONTHS_ES, animateStats } from './ui.js';
 import { icon } from './icons.js';
 
 // `source`/`sourceId` son opcionales: identifican qué registro originó el
@@ -53,15 +53,19 @@ export async function renderCaja() {
   }
   const ent = movs.filter(m => m.type === 'entrada').reduce((s, m) => s + Number(m.amount), 0);
   const sal = movs.filter(m => m.type === 'salida').reduce((s, m) => s + Number(m.amount), 0);
-  document.getElementById('cajaBalance').innerHTML = `
+  const balEl = document.getElementById('cajaBalance');
+  balEl.innerHTML = `
     <div class="balance-card">
       <div class="bal-label">Saldo disponible</div>
-      <div class="bal-amount">${$M(ent - sal)}</div>
+      <div class="bal-amount" data-count="${ent - sal}" data-money="1">$0</div>
     </div>`;
-  document.getElementById('statsCaja').innerHTML = `
-    <div class="stat"><div class="stat-val t-success" style="font-size:1rem">${$M(ent)}</div><div class="stat-lbl">Entradas</div></div>
-    <div class="stat"><div class="stat-val t-danger" style="font-size:1rem">${$M(sal)}</div><div class="stat-lbl">Salidas</div></div>
-    <div class="stat"><div class="stat-val">${movs.length}</div><div class="stat-lbl">Movimientos</div></div>`;
+  animateStats(balEl);
+  const statsEl = document.getElementById('statsCaja');
+  statsEl.innerHTML = `
+    <div class="stat"><div class="stat-val t-success" style="font-size:1rem" data-count="${ent}" data-money="1">$0</div><div class="stat-lbl">Entradas</div></div>
+    <div class="stat"><div class="stat-val t-danger" style="font-size:1rem" data-count="${sal}" data-money="1">$0</div><div class="stat-lbl">Salidas</div></div>
+    <div class="stat"><div class="stat-val" data-count="${movs.length}">0</div><div class="stat-lbl">Movimientos</div></div>`;
+  animateStats(statsEl);
   list.innerHTML = movs.length ? movs.map(m => `
     <div class="mov">
       <div class="mov-ico ${m.type}" aria-hidden="true">${icon(m.type === 'entrada' ? 'arrowUpRight' : 'arrowDownRight', { size: 17 })}</div>

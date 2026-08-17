@@ -1,6 +1,6 @@
 // ── Módulo Presupuestos ──────────────────────────────────────────
 import { supabase } from './supabaseClient.js';
-import { $M, $D, esc, toast, openModal, closeModal, skeletonCards, errorState, confirmDialog, groupByMonth } from './ui.js';
+import { $M, $D, esc, toast, openModal, closeModal, skeletonCards, errorState, confirmDialog, groupByMonth, animateStats } from './ui.js';
 import { icon } from './icons.js';
 
 const QL = { pendiente: 'Pendiente', enviado: 'Enviado', aceptado: 'Aceptado', rechazado: 'Rechazado' };
@@ -22,10 +22,12 @@ export async function renderQuotes() {
 
   const pend = quotes.filter(x => x.status === 'pendiente' || x.status === 'enviado').length;
   const acep = quotes.filter(x => x.status === 'aceptado').length;
-  document.getElementById('statsQuotes').innerHTML = `
-    <div class="stat"><div class="stat-val" style="color:var(--primary-bright)">${pend}</div><div class="stat-lbl">Pendientes</div></div>
-    <div class="stat"><div class="stat-val t-success">${acep}</div><div class="stat-lbl">Aceptados</div></div>
-    <div class="stat"><div class="stat-val">${quotes.length}</div><div class="stat-lbl">Total</div></div>`;
+  const statsEl = document.getElementById('statsQuotes');
+  statsEl.innerHTML = `
+    <div class="stat"><div class="stat-val" style="color:var(--primary-bright)" data-count="${pend}">0</div><div class="stat-lbl">Pendientes</div></div>
+    <div class="stat"><div class="stat-val t-success" data-count="${acep}">0</div><div class="stat-lbl">Aceptados</div></div>
+    <div class="stat"><div class="stat-val" data-count="${quotes.length}">0</div><div class="stat-lbl">Total</div></div>`;
+  animateStats(statsEl);
 
   list.innerHTML = filtered.length ? groupByMonth(filtered, 'created_at', p => `
     <div class="card" onclick="TS.viewQuote('${p.id}')">
