@@ -55,8 +55,8 @@ export async function renderOrders() {
         ${icon('calendar', { size: 13 })} ${$D(o.created_at)}&nbsp;·&nbsp;${o.problem ? icon('chat', { size: 13 }) + ' ' + esc(o.problem.slice(0, 38)) + (o.problem.length > 38 ? '…' : '') : 'Sin descripción'}
       </div>
       <div class="row" style="margin-top:6px;gap:10px">
-        ${o.cost ? `<div class="t-success fw-700">${$M(o.cost)}</div>` : ''}
-        ${owed > 0 ? `<div class="t-muted" style="font-size:.75rem">Debe ${$M(owed)}</div>` : (o.cost ? `<div class="t-muted" style="font-size:.75rem">Pagado</div>` : '')}
+        ${o.cost ? `<div class="t-success fw-700 num">${$M(o.cost)}</div>` : ''}
+        ${owed > 0 ? `<div class="t-muted" style="font-size:.75rem">Debe <span class="num">${$M(owed)}</span></div>` : (o.cost ? `<div class="t-muted" style="font-size:.75rem">Pagado</div>` : '')}
       </div>
     </div>`;
   })
@@ -129,7 +129,7 @@ export async function viewOrder(id) {
 
     <div class="detail-row mt-12" style="border-top:1px solid var(--border);padding-top:12px">
       <span class="fw-700">Total</span>
-      <span class="t-success fw-700" style="font-size:1.1rem">${$M(o.cost)}</span>
+      <span class="t-success fw-700 num" style="font-size:1.1rem">${$M(o.cost)}</span>
     </div>
     <div class="row mt-4">
       <label class="sr-only" for="new-cost">Actualizar costo total</label>
@@ -164,7 +164,7 @@ export async function viewOrder(id) {
 
 function renderWorks(works) {
   if (!works || !works.length) return '<div class="t-muted" style="padding:6px 0;font-size:.82rem">Sin trabajos registrados</div>';
-  return works.map(w => `<div class="work-item"><span>${esc(w.description)}</span><div class="row"><span class="t-success">${$M(w.cost)}</span><button class="icon-x" onclick="TS.delWork('${w.id}','${w.order_id}')" aria-label="Eliminar trabajo: ${esc(w.description)}">${icon('close', { size: 15 })}</button></div></div>`).join('');
+  return works.map(w => `<div class="work-item"><span>${esc(w.description)}</span><div class="row"><span class="t-success num">${$M(w.cost)}</span><button class="icon-x" onclick="TS.delWork('${w.id}','${w.order_id}')" aria-label="Eliminar trabajo: ${esc(w.description)}">${icon('close', { size: 15 })}</button></div></div>`).join('');
 }
 
 export async function setStatus(id, s) {

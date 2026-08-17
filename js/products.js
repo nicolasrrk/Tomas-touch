@@ -63,8 +63,8 @@ export async function renderProducts() {
         </div>
         <span class="badge badge-${p.status}">${label[p.status]}</span>
       </div>
-      ${p.status === 'vendido' ? `<div class="t-success" style="font-size:.82rem;margin-top:6px">Ganancia: ${$M(Number(p.sell_price) - totalCost(p))}</div>` : ''}
-      ${(() => { const owed = Number(p.sell_price || 0) - Number(p.deposit || 0); return owed > 0 && Number(p.sell_price) > 0 ? `<div class="t-muted" style="font-size:.75rem;margin-top:2px">Debe ${$M(owed)}</div>` : ''; })()}
+      ${p.status === 'vendido' ? `<div class="t-success" style="font-size:.82rem;margin-top:6px">Ganancia: <span class="num">${$M(Number(p.sell_price) - totalCost(p))}</span></div>` : ''}
+      ${(() => { const owed = Number(p.sell_price || 0) - Number(p.deposit || 0); return owed > 0 && Number(p.sell_price) > 0 ? `<div class="t-muted" style="font-size:.75rem;margin-top:2px">Debe <span class="num">${$M(owed)}</span></div>` : ''; })()}
       <div class="t-muted" style="font-size:.75rem;margin-top:4px">${$D(p.created_at)}</div>
     </div>`;
   }).join('')
@@ -163,7 +163,7 @@ export async function viewProduct(id) {
 
 function renderCosts(costs) {
   if (!costs.length) return '<div class="t-muted" style="padding:6px 0;font-size:.82rem">Sin repuestos ni gastos cargados</div>';
-  return costs.map(c => `<div class="work-item"><span>${esc(c.description)}</span><div class="row"><span class="t-danger">${$M(c.amount)}</span><button class="icon-x" onclick="TS.delProductCost('${c.id}','${c.product_id}')" aria-label="Eliminar: ${esc(c.description)}">${icon('close', { size: 15 })}</button></div></div>`).join('');
+  return costs.map(c => `<div class="work-item"><span>${esc(c.description)}</span><div class="row"><span class="t-danger num">${$M(c.amount)}</span><button class="icon-x" onclick="TS.delProductCost('${c.id}','${c.product_id}')" aria-label="Eliminar: ${esc(c.description)}">${icon('close', { size: 15 })}</button></div></div>`).join('');
 }
 
 // El "desglose" es el toque especial: muestra de un vistazo si el equipo

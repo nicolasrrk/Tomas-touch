@@ -38,7 +38,7 @@ export async function renderQuotes() {
         </div>
         <span class="badge badge-${p.status}">${QL[p.status]}</span>
       </div>
-      <div class="t-success fw-700" style="margin-top:6px">${$M(p.total)}</div>
+      <div class="t-success fw-700 num" style="margin-top:6px">${$M(p.total)}</div>
       <div class="t-muted" style="font-size:.75rem;margin-top:4px">${$D(p.created_at)}</div>
     </div>`)
     : `<div class="empty"><div class="empty-ico">${icon('document', { size: 40 })}</div>No hay presupuestos aún<br><span class="t-muted" style="font-size:.8rem">Tocá + para crear uno</span></div>`;
@@ -99,7 +99,7 @@ export async function viewQuote(id) {
 
     <div class="detail-row mt-12" style="border-top:1px solid var(--border);padding-top:12px">
       <span class="fw-700">Total estimado</span>
-      <span class="t-success fw-700" style="font-size:1.1rem">${$M(p.total)}</span>
+      <span class="t-success fw-700 num" style="font-size:1.1rem">${$M(p.total)}</span>
     </div>
 
     <div class="row-wrap mt-16">
@@ -112,7 +112,7 @@ export async function viewQuote(id) {
 
 function renderQuoteItems(items) {
   if (!items.length) return '<div class="t-muted" style="padding:6px 0;font-size:.82rem">Sin ítems cargados</div>';
-  return items.map(i => `<div class="work-item"><span>${esc(i.description)}</span><div class="row"><span class="t-success">${$M(i.amount)}</span><button class="icon-x" onclick="TS.delQuoteItem('${i.id}','${i.quote_id}')" aria-label="Eliminar ítem: ${esc(i.description)}">${icon('close', { size: 15 })}</button></div></div>`).join('');
+  return items.map(i => `<div class="work-item"><span>${esc(i.description)}</span><div class="row"><span class="t-success num">${$M(i.amount)}</span><button class="icon-x" onclick="TS.delQuoteItem('${i.id}','${i.quote_id}')" aria-label="Eliminar ítem: ${esc(i.description)}">${icon('close', { size: 15 })}</button></div></div>`).join('');
 }
 
 export async function addQuoteItem(id) {
