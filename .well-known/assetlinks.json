@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "ar.touchservis.app",
+        "sha256_cert_fingerprints": ["A3:2F:1D:2D:08:EA:DA:4C:CA:0C:05:9C:D6:C4:D4:D5:6E:F2:92:D2:90:A9:A6:87:19:45:D5:27:4F:45:98:5E"]
+      }
+    }]

@@ -5,3 +5,10 @@
 .DS_Store
 Thumbs.db
 node_modules/
+
+# Empaquetado Android: la clave de firma NUNCA va al repo (perderla o
+# filtrarla es irreversible — sin ella no se puede volver a firmar una
+# actualización de la misma app). El .apk/.aab tampoco se versiona (binario
+# generado, no código fuente). Solo .well-known/assetlinks.json es público
+# a propósito.
+android-release/
