@@ -3,7 +3,7 @@
 // para que se pueda seguir usando la app sin conexión, pero se actualice
 // solo apenas haya red. Los pedidos a Supabase (datos del taller) NUNCA se
 // interceptan: siempre van directo a la red, para no mostrar info vieja.
-const CACHE_NAME = 'touch-servis-v1';
+const CACHE_NAME = 'touch-servis-v2';
 
 const APP_SHELL = [
   './',
@@ -20,7 +20,10 @@ const APP_SHELL = [
   './js/caja.js',
   './js/icons.js',
   './js/main.js',
-  './manifest.json'
+  './manifest.json',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './icons/icon-512-maskable.png'
 ];
 
 self.addEventListener('install', (event) => {
