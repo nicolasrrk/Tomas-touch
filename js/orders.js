@@ -1,7 +1,7 @@
 // ── Módulo Órdenes de reparación ────────────────────────────────
 import { supabase } from './supabaseClient.js';
 import { BUCKET_ORDERS } from './config.js';
-import { $M, $D, esc, toast, openModal, closeModal, skeletonCards, errorState, confirmDialog, groupByMonth, animateStats, matchesMonth, refreshMonthFilterOptions } from './ui.js';
+import { $M, $D, esc, toast, openModal, closeModal, skeletonCards, errorState, confirmDialog, groupByMonth, animateStats, matchesMonth, refreshMonthFilterOptions, amountFromInput } from './ui.js';
 import { uploadPhoto, listPhotos, deletePhoto } from './storage.js';
 import { icon } from './icons.js';
 import { cajaPush, deleteMovementsBySource } from './caja.js';
@@ -10,27 +10,49 @@ const SL = { ingresado: 'Ingresado', en_proceso: 'En proceso', terminado: 'Termi
 const SO = ['ingresado', 'en_proceso', 'terminado', 'entregado'];
 
 let cache = [];
+let loaded = false; // si ya se trajo al menos una vez de la red
+let loading = null; // Promise del fetch en vuelo, o null
 let monthFilter = ''; // '' = todos los meses
 
-/** Cambia el mes filtrado y vuelve a renderizar. */
-export function setMonthFilter(v) { monthFilter = v; renderOrders(); }
+/** Cambia el mes filtrado y vuelve a pintar (sin red: ya está todo en cache). */
+export function setMonthFilter(v) { monthFilter = v; paintOrders(); }
 
 async function fetchOrders() {
   const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
   if (error) throw error;
   cache = data || [];
+  loaded = true;
   return cache;
 }
 
+/** Trae de la red y pinta. Se usa en la navegación inicial de página y tras
+ *  crear/editar/borrar algo (necesita datos frescos). */
 export async function renderOrders() {
   const list = document.getElementById('listOrders');
   list.innerHTML = skeletonCards(3);
-  let orders;
-  try { orders = await fetchOrders(); }
-  catch (e) {
+  try {
+    // Si ya hay un fetch en vuelo (ej. el buscador dispara paintOrders() en
+    // cada tecla mientras todavía no cargó nada), lo reusa en vez de abrir
+    // uno nuevo por cada evento — evita una ráfaga de requests duplicados.
+    loading = loading || fetchOrders();
+    await loading;
+  } catch (e) {
+    loading = null;
     list.innerHTML = errorState('No se pudieron cargar las órdenes.', 'Reintentar', 'onclick="TS.renderOrders()"');
     return;
   }
+  loading = null;
+  paintOrders();
+}
+
+/** Re-pinta desde cache (buscador, filtro de mes): cero requests a Supabase.
+ *  Si todavía no se cargó nada (primera vez que se abre la página), cae a
+ *  renderOrders() para no dejar la pantalla vacía — pero solo si no hay ya
+ *  un fetch en curso, para no duplicar requests. */
+export function paintOrders() {
+  if (!loaded) { if (!loading) renderOrders(); return; }
+  const list = document.getElementById('listOrders');
+  const orders = cache;
   refreshMonthFilterOptions(document.getElementById('filterMonthOrders'), orders, 'created_at', monthFilter);
   const scoped = orders.filter(o => matchesMonth(o, 'created_at', monthFilter));
   const q = (document.getElementById('searchOrders')?.value || '').toLowerCase();
@@ -92,7 +114,7 @@ async function createOrder() {
     phone: document.getElementById('f-ph').value.trim(),
     device: dv,
     problem: document.getElementById('f-pr').value.trim(),
-    cost: parseFloat(document.getElementById('f-co').value) || 0,
+    cost: amountFromInput('f-co'),
     status: 'ingresado'
   };
   const { error } = await supabase.from('orders').insert(payload);
@@ -184,7 +206,7 @@ export async function setStatus(id, s) {
 
 export async function addWork(id) {
   const d = document.getElementById('w-d').value.trim();
-  const c = parseFloat(document.getElementById('w-c').value) || 0;
+  const c = amountFromInput('w-c');
   if (!d) { toast('Ingresá una descripción', 'warn'); return; }
   const { error } = await supabase.from('order_works').insert({ order_id: id, description: d, cost: c });
   if (error) { toast('No se pudo agregar el trabajo', 'danger'); return; }
@@ -200,7 +222,7 @@ export async function delWork(workId, orderId) {
 
 export async function updateCost(id) {
   const v = parseFloat(document.getElementById('new-cost').value);
-  if (isNaN(v)) return;
+  if (isNaN(v) || v < 0) { toast('Ingresá un costo válido', 'warn'); return; }
   const { error } = await supabase.from('orders').update({ cost: v }).eq('id', id);
   if (error) { toast('No se pudo actualizar el costo', 'danger'); return; }
   viewOrder(id); renderOrders();
@@ -210,7 +232,7 @@ export async function updateCost(id) {
 // reducción (ajuste o devolución) genera una salida — igual que repuestos.
 export async function updateDeposit(id) {
   const v = parseFloat(document.getElementById('new-deposit').value);
-  if (isNaN(v) || v < 0) return;
+  if (isNaN(v) || v < 0) { toast('Ingresá un abono válido', 'warn'); return; }
   const { data: cur } = await supabase.from('orders').select('deposit, device').eq('id', id).single();
   const diff = v - Number(cur?.deposit || 0);
   const { error } = await supabase.from('orders').update({ deposit: v }).eq('id', id);

@@ -1,0 +1,15 @@
+{
+  "name": "Touch Servis",
+  "short_name": "Touch Servis",
+  "description": "Gestión interna de Touch Servis: órdenes de reparación, equipos nuevos/usados y caja.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "lang": "es-AR",
+  "icons": [
+    { "src": "icon.svg", "type": "image/svg+xml", "sizes": "any" }
+  ]
+}

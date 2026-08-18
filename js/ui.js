@@ -5,6 +5,14 @@ const TOAST_ICON = { success: 'checkCircle', danger: 'xCircle', warn: 'alert', i
 
 export function $M(n) { return '$' + Number(n || 0).toLocaleString('es-AR'); }
 
+/** Lee un input numérico por id y lo devuelve como monto válido: nunca
+ *  NaN, nunca negativo (protege contra un "-" tipeado sin querer generando
+ *  un movimiento de caja o costo negativo silencioso). Usado en todos los
+ *  formularios de montos (compra/venta, trabajos, ítems, repuestos, caja). */
+export function amountFromInput(id) {
+  return Math.max(0, parseFloat(document.getElementById(id).value) || 0);
+}
+
 export function $D(d) {
   if (!d) return '';
   return new Date(d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });

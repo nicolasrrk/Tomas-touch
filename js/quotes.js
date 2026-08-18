@@ -1,26 +1,52 @@
 // ── Módulo Presupuestos ──────────────────────────────────────────
 import { supabase } from './supabaseClient.js';
-import { $M, $D, esc, toast, openModal, closeModal, skeletonCards, errorState, confirmDialog, groupByMonth, animateStats, matchesMonth, refreshMonthFilterOptions } from './ui.js';
+import { $M, $D, esc, toast, openModal, closeModal, skeletonCards, errorState, confirmDialog, groupByMonth, animateStats, matchesMonth, refreshMonthFilterOptions, amountFromInput } from './ui.js';
 import { icon } from './icons.js';
 
 const QL = { pendiente: 'Pendiente', enviado: 'Enviado', aceptado: 'Aceptado', rechazado: 'Rechazado' };
+let cache = [];
+let loaded = false; // si ya se trajo al menos una vez de la red
+let loading = null; // Promise del fetch en vuelo, o null
 let monthFilter = '';
 
-/** Cambia el mes filtrado y vuelve a renderizar. */
-export function setMonthFilter(v) { monthFilter = v; renderQuotes(); }
+/** Cambia el mes filtrado y vuelve a pintar (sin red: ya está todo en cache). */
+export function setMonthFilter(v) { monthFilter = v; paintQuotes(); }
 
+async function fetchQuotes() {
+  const { data, error } = await supabase.from('quotes').select('*').order('created_at', { ascending: false });
+  if (error) throw error;
+  cache = data || [];
+  loaded = true;
+  return cache;
+}
+
+/** Trae de la red y pinta. Se usa en la navegación inicial de página y tras
+ *  crear/editar/borrar algo (necesita datos frescos). */
 export async function renderQuotes() {
   const list = document.getElementById('listQuotes');
   list.innerHTML = skeletonCards(3);
-  let quotes;
   try {
-    const { data, error } = await supabase.from('quotes').select('*').order('created_at', { ascending: false });
-    if (error) throw error;
-    quotes = data || [];
+    // Reusa el fetch en vuelo si ya hay uno (buscador disparando en cada
+    // tecla mientras todavía no cargó nada) en vez de duplicar requests.
+    loading = loading || fetchQuotes();
+    await loading;
   } catch (e) {
+    loading = null;
     list.innerHTML = errorState('No se pudieron cargar los presupuestos.', 'Reintentar', 'onclick="TS.renderQuotes()"');
     return;
   }
+  loading = null;
+  paintQuotes();
+}
+
+/** Re-pinta desde cache (buscador, filtro de mes): cero requests a Supabase.
+ *  Si todavía no se cargó nada (primera vez que se abre la página), cae a
+ *  renderQuotes() para no dejar la pantalla vacía — salvo que ya haya un
+ *  fetch en curso, para no duplicar requests. */
+export function paintQuotes() {
+  if (!loaded) { if (!loading) renderQuotes(); return; }
+  const list = document.getElementById('listQuotes');
+  const quotes = cache;
   refreshMonthFilterOptions(document.getElementById('filterMonthQuotes'), quotes, 'created_at', monthFilter);
   const scoped = quotes.filter(x => matchesMonth(x, 'created_at', monthFilter));
   const q = (document.getElementById('searchQuotes')?.value || '').toLowerCase();
@@ -123,7 +149,7 @@ function renderQuoteItems(items) {
 
 export async function addQuoteItem(id) {
   const d = document.getElementById('qi-d').value.trim();
-  const c = parseFloat(document.getElementById('qi-c').value) || 0;
+  const c = amountFromInput('qi-c');
   if (!d) { toast('Ingresá una descripción', 'warn'); return; }
   const { error } = await supabase.from('quote_items').insert({ quote_id: id, description: d, amount: c });
   if (error) { toast('No se pudo agregar', 'danger'); return; }

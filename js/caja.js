@@ -1,6 +1,6 @@
 // ── Módulo Caja (movimientos de dinero) ─────────────────────────
 import { supabase } from './supabaseClient.js';
-import { $M, $D, esc, toast, closeModal, skeletonCards, errorState, confirmDialog, MONTHS_ES, animateStats, matchesMonth, refreshMonthFilterOptions } from './ui.js';
+import { $M, $D, esc, toast, closeModal, skeletonCards, errorState, confirmDialog, MONTHS_ES, animateStats, matchesMonth, refreshMonthFilterOptions, amountFromInput } from './ui.js';
 import { icon } from './icons.js';
 
 // `source`/`sourceId` son opcionales: identifican qué registro originó el
@@ -42,21 +42,49 @@ export async function deleteMovementsForProduct(productId, costIds = []) {
   results.forEach(r => { if (r.error) console.error('deleteMovementsForProduct', r.error); });
 }
 
+let cache = [];
+let loaded = false; // si ya se trajo al menos una vez de la red
+let loading = null; // Promise del fetch en vuelo, o null
 let monthFilter = '';
 
-/** Cambia el mes filtrado y vuelve a renderizar. No afecta el saldo
- *  disponible (es acumulado histórico, filtrarlo sería engañoso). */
-export function setMonthFilter(v) { monthFilter = v; renderCaja(); }
+/** Cambia el mes filtrado y vuelve a pintar (sin red: ya está todo en cache).
+ *  No afecta el saldo disponible (es acumulado histórico, filtrarlo sería engañoso). */
+export function setMonthFilter(v) { monthFilter = v; paintCaja(); }
 
+async function fetchCaja() {
+  const { data, error } = await supabase.from('caja_movimientos')
+    .select('*').order('created_at', { ascending: false });
+  if (error) throw error;
+  cache = data || [];
+  loaded = true;
+  return cache;
+}
+
+/** Trae de la red y pinta. Se usa en la navegación inicial de página y tras
+ *  crear/borrar un movimiento (necesita datos frescos). */
 export async function renderCaja() {
   const list = document.getElementById('listCaja');
   list.innerHTML = skeletonCards(3);
-  const { data: movs, error } = await supabase.from('caja_movimientos')
-    .select('*').order('created_at', { ascending: false });
-  if (error) {
+  try {
+    loading = loading || fetchCaja();
+    await loading;
+  } catch (e) {
+    loading = null;
     list.innerHTML = errorState('No se pudo cargar la caja.', 'Reintentar', 'onclick="TS.renderCaja()"');
     return;
   }
+  loading = null;
+  paintCaja();
+}
+
+/** Re-pinta desde cache (filtro de mes): cero requests a Supabase. Si
+ *  todavía no se cargó nada (primera vez que se abre la página), cae a
+ *  renderCaja() para no dejar la pantalla vacía — salvo que ya haya un
+ *  fetch en curso, para no duplicar requests. */
+export function paintCaja() {
+  if (!loaded) { if (!loading) renderCaja(); return; }
+  const list = document.getElementById('listCaja');
+  const movs = cache;
   // Saldo disponible: SIEMPRE sobre el histórico completo, sin filtrar.
   const entTotal = movs.filter(m => m.type === 'entrada').reduce((s, m) => s + Number(m.amount), 0);
   const salTotal = movs.filter(m => m.type === 'salida').reduce((s, m) => s + Number(m.amount), 0);
@@ -105,7 +133,7 @@ export function newMovModal() {
 
 async function createMov() {
   const d = document.getElementById('m-d').value.trim();
-  const a = parseFloat(document.getElementById('m-a').value) || 0;
+  const a = amountFromInput('m-a');
   if (!d || !a) { toast('Completá descripción y monto', 'warn'); return; }
   const { error } = await supabase.from('caja_movimientos').insert({
     type: document.getElementById('m-t').value, description: d, amount: a

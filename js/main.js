@@ -95,8 +95,8 @@ window.TS = {
 initDialogs();
 initSpotlight();
 document.getElementById('login-form').addEventListener('submit', handleLogin);
-document.getElementById('searchOrders').addEventListener('input', () => Orders.renderOrders());
-document.getElementById('searchQuotes').addEventListener('input', () => Quotes.renderQuotes());
+document.getElementById('searchOrders').addEventListener('input', () => Orders.paintOrders());
+document.getElementById('searchQuotes').addEventListener('input', () => Quotes.paintQuotes());
 const reportMonthInput = document.getElementById('reportMonth');
 if (reportMonthInput) reportMonthInput.value = new Date().toISOString().slice(0, 7);
 
@@ -109,3 +109,11 @@ onAuthChange((session) => {
 });
 
 initAuth();
+
+// ── PWA: registrar el service worker (app shell offline) ────────
+// No debe bloquear el arranque de la app si falla — solo se avisa por consola.
+if ('serviceWorker' in navigator) {
+  try {
+    navigator.serviceWorker.register('sw.js').catch(e => console.warn('No se pudo registrar el service worker:', e));
+  } catch (e) { console.warn('No se pudo registrar el service worker:', e); }
+}

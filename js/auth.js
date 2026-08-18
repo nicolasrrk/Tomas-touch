@@ -12,8 +12,16 @@ export function getSession() { return currentSession; }
 export function isLoggedIn() { return !!currentSession; }
 
 export async function initAuth() {
-  const { data } = await supabase.auth.getSession();
-  currentSession = data.session;
+  try {
+    const { data } = await supabase.auth.getSession();
+    currentSession = data.session;
+  } catch (e) {
+    // Sin red o servicio caído: no se puede saber si hay sesión. Se avisa y
+    // se queda en la pantalla de login (estado visual por default) en vez
+    // de dejar la app colgada sin feedback.
+    currentSession = null;
+    toast('No se pudo conectar. Revisá tu conexión.', 'danger');
+  }
   supabase.auth.onAuthStateChange((_event, session) => {
     currentSession = session;
     notify();

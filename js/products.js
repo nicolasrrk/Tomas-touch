@@ -1,16 +1,24 @@
 // ── Módulo Nuevos / Usados (catálogo de equipos) ────────────────
 import { supabase } from './supabaseClient.js';
 import { BUCKET_PRODUCTS } from './config.js';
-import { $M, $D, esc, toast, openModal, closeModal, skeletonCards, errorState, confirmDialog, promptDialog, animateStats, matchesMonth, refreshMonthFilterOptions } from './ui.js';
+import { $M, $D, esc, toast, openModal, closeModal, skeletonCards, errorState, confirmDialog, promptDialog, animateStats, matchesMonth, refreshMonthFilterOptions, amountFromInput } from './ui.js';
 import { uploadPhoto, listPhotos, deletePhoto } from './storage.js';
 import { cajaPush, deleteMovementsBySource, deleteMovementsForProduct } from './caja.js';
 import { icon } from './icons.js';
 
 export let currentKind = 'usado'; // sub-tab activo dentro de la página
+// Cache separado por kind (nuevo/usado): si se cachearan juntos en una sola
+// variable, una respuesta que llega tarde de un tab ya abandonado podía
+// pisar los datos del tab activo (condición de carrera al cambiar rápido
+// de sub-tab). Con una key por kind, cada fetch solo puede escribir su
+// propio slot, sin importar el orden en que resuelvan.
+let cache = { nuevo: [], usado: [] };
+let loaded = { nuevo: false, usado: false };
+let loading = { nuevo: null, usado: null }; // Promise del fetch en vuelo por kind, o null
 let monthFilter = '';
 
-/** Cambia el mes filtrado y vuelve a renderizar. */
-export function setMonthFilter(v) { monthFilter = v; renderProducts(); }
+/** Cambia el mes filtrado y vuelve a pintar (sin red: ya está todo en cache). */
+export function setMonthFilter(v) { monthFilter = v; paintProducts(); }
 
 export function setKind(kind) {
   currentKind = kind;
@@ -26,7 +34,9 @@ async function fetchProducts(kind) {
   const { data, error } = await supabase.from('products').select('*, product_costs(amount)')
     .eq('kind', kind).order('created_at', { ascending: false });
   if (error) throw error;
-  return data || [];
+  cache[kind] = data || [];
+  loaded[kind] = true;
+  return cache[kind];
 }
 
 // Costo real de un equipo = lo que costó comprarlo + repuestos/gastos aplicados.
@@ -37,15 +47,35 @@ function totalCost(p) { return Number(p.buy_price || 0) + extraCosts(p); }
 // se guarda al abrir el detalle y se reutiliza (se limpia si se cambia de equipo).
 let viewedProduct = { id: null, device: null };
 
+/** Trae de la red y pinta. Se usa en la navegación inicial de página, al
+ *  cambiar de sub-tab (nuevo/usado, es otro dataset) y tras crear/editar/
+ *  borrar algo (necesita datos frescos). */
 export async function renderProducts() {
+  const kind = currentKind;
   const list = document.getElementById('listUsados');
   list.innerHTML = skeletonCards(3);
-  let items;
-  try { items = await fetchProducts(currentKind); }
-  catch (e) {
+  try {
+    // Reusa el fetch en vuelo de este kind si ya hay uno, en vez de
+    // duplicar requests (ej. cambios de filtro repetidos antes de cargar).
+    loading[kind] = loading[kind] || fetchProducts(kind);
+    await loading[kind];
+  } catch (e) {
+    loading[kind] = null;
     list.innerHTML = errorState('No se pudo cargar el catálogo.', 'Reintentar', 'onclick="TS.renderProducts()"');
     return;
   }
+  loading[kind] = null;
+  paintProducts();
+}
+
+/** Re-pinta desde cache (filtro de mes): cero requests a Supabase. Si
+ *  todavía no se cargó nada (primera vez que se abre la página), cae a
+ *  renderProducts() para no dejar la pantalla vacía — salvo que ya haya un
+ *  fetch en curso para este kind, para no duplicar requests. */
+export function paintProducts() {
+  if (!loaded[currentKind]) { if (!loading[currentKind]) renderProducts(); return; }
+  const list = document.getElementById('listUsados');
+  const items = cache[currentKind];
   refreshMonthFilterOptions(document.getElementById('filterMonthProducts'), items, 'created_at', monthFilter);
   const scoped = items.filter(x => matchesMonth(x, 'created_at', monthFilter));
   const disp = scoped.filter(x => x.status === 'disponible').length;
@@ -102,8 +132,8 @@ async function createProduct() {
   const dv = document.getElementById('p-dv').value.trim();
   if (!dv) { toast('Ingresá el dispositivo', 'warn'); return; }
   const kind = document.getElementById('p-kind').value;
-  const buy = parseFloat(document.getElementById('p-buy').value) || 0;
-  const sell = parseFloat(document.getElementById('p-sel').value) || 0;
+  const buy = amountFromInput('p-buy');
+  const sell = amountFromInput('p-sel');
   const status = document.getElementById('p-st').value;
   const notes = document.getElementById('p-nt').value.trim();
   const { data: created, error } = await supabase.from('products')
@@ -210,7 +240,7 @@ function renderDepositBlock(p) {
 // la diferencia (entrada si aumenta, salida si se ajusta/devuelve).
 export async function updateProductDeposit(id) {
   const v = parseFloat(document.getElementById('new-deposit').value);
-  if (isNaN(v) || v < 0) return;
+  if (isNaN(v) || v < 0) { toast('Ingresá un abono válido', 'warn'); return; }
   const { data: cur } = await supabase.from('products').select('deposit, device').eq('id', id).single();
   const diff = v - Number(cur?.deposit || 0);
   const { error } = await supabase.from('products').update({ deposit: v }).eq('id', id);
@@ -223,7 +253,7 @@ export async function updateProductDeposit(id) {
 
 export async function addProductCost(id) {
   const d = document.getElementById('c-d').value.trim();
-  const a = parseFloat(document.getElementById('c-a').value) || 0;
+  const a = amountFromInput('c-a');
   if (!d) { toast('Ingresá una descripción', 'warn'); return; }
   const { data: created, error } = await supabase.from('product_costs')
     .insert({ product_id: id, description: d, amount: a }).select('id').single();
@@ -248,7 +278,11 @@ export async function markSold(id) {
   if (!p) return;
   const priceStr = await promptDialog('Precio de venta final ($):', p.sell_price || '');
   if (priceStr === null) return;
-  const sell = parseFloat(priceStr) || p.sell_price;
+  const parsed = parseFloat(priceStr);
+  // 0 es un precio final válido (ej. equipo entregado sin cargo) — solo se
+  // cae al precio anterior si lo tipeado no es un número real.
+  if (isNaN(parsed)) { toast('Precio inválido, se mantuvo el anterior', 'warn'); }
+  const sell = Math.max(0, Number.isFinite(parsed) ? parsed : (p.sell_price || 0));
   // Si ya hubo abonos cargados, solo se cobra el saldo restante — el abono
   // ya se había registrado en Caja al momento de recibirlo, no se duplica.
   const remaining = sell - Number(p.deposit || 0);

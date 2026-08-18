@@ -6,22 +6,29 @@ App interna de gestión para el taller: **órdenes de reparación**, **presupues
 
 ```
 index.html          → shell de la app + pantalla de login
+manifest.json        → metadata PWA (nombre, colores, ícono) para "Agregar a inicio"
+sw.js                 → service worker: cachea el app shell para uso offline básico
+icon.svg               → ícono de la app (mismo diseño que el favicon), usado por manifest.json
+robots.txt              → bloquea indexación (es un panel interno, no debe salir en buscadores)
+.nojekyll                → desactiva el procesamiento Jekyll de GitHub Pages
 css/styles.css       → todos los estilos
 js/
   config.js          → URL y clave pública de Supabase (seguro exponerla, ver abajo)
   supabaseClient.js   → cliente Supabase compartido
   auth.js             → login/logout, sesión
-  ui.js               → helpers: toasts, modal, formato de moneda/fecha, skeletons
+  ui.js               → helpers: toasts, modal, formato de moneda/fecha, skeletons, parseo de montos
   storage.js           → subir/listar/borrar fotos (URLs firmadas, buckets privados)
   orders.js            → módulo Órdenes: trabajos, abono/saldo, agrupado y filtrado por mes, PDF
   quotes.js             → módulo Presupuestos: ítems, PDF, "Convertir a Orden", filtrado por mes
   products.js          → módulo Nuevos/Usados: repuestos/gastos, abono/saldo, desglose de rentabilidad, filtrado por mes
   caja.js               → módulo Caja: movimientos filtrables por mes, saldo histórico, reporte mensual en PDF
   icons.js              → set de íconos SVG (sin emojis en toda la app)
-  main.js                → router, wiring de eventos, arranque
+  main.js                → router, wiring de eventos, arranque, registro del service worker
 legacy/
   touch-servis-localstorage.html → versión anterior (localStorage, sin login, un solo archivo). Se deja como referencia, no se usa más.
 ```
+
+Cada módulo de datos (`orders.js`, `quotes.js`, `products.js`, `caja.js`) separa "traer de la red" de "pintar": el buscador y el filtro de mes re-pintan desde un cache en memoria sin volver a pedirle nada a Supabase; solo se refetchea al entrar a la página o después de crear/editar/borrar algo.
 
 ## Backend (Supabase)
 
@@ -73,4 +80,4 @@ Estructura pensada para crecer sin reescribir nada:
 - **Búsqueda en Caja**: Órdenes, Presupuestos y Nuevos/Usados ya tienen buscador; Caja todavía no — el patrón ya está armado para copiarlo.
 - **Cobro automático al entregar**: hoy el abono de una orden se actualiza a mano; se podría ofrecer "completar el saldo" con un solo botón al marcar `entregado`, igual que ya hace "Marcar vendido" en Nuevos/Usados.
 - **Tabla `settings`**: ya existe vacía en la base — pensada para una futura pantalla de configuración (nombre del negocio, teléfono de contacto, logo, etc.) sin tener que migrar el esquema.
-- **PWA**: agregar un `manifest.json` + service worker para poder "instalar" la app en el celular y tener soporte offline básico.
+- ~~**PWA**: agregar un `manifest.json` + service worker...~~ ✅ Hecho: `manifest.json` + `sw.js` cachean el app shell (nunca los datos de Supabase), instalable desde el navegador del celular.
