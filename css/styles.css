@@ -119,10 +119,18 @@ body{
 .badge-enviado{background:var(--primary-mid-bg);color:#CFE3FF}
 .badge-aceptado{background:var(--primary);color:#FFFFFF}
 .badge-rechazado{background:#FFFFFF0F;color:var(--muted)}
+/* Vencido: única señal fuera de la escalera de azules — blanco sólido, la
+   máxima intensidad disponible en la paleta, para que corte contra el resto. */
+.badge-overdue{background:var(--white);color:var(--bg2);display:inline-flex;align-items:center;gap:3px}
+.card-overdue{border-color:var(--white)}
 
 /* ── Stats ────────────────────────────────────────────────────── */
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
-.stat{background:var(--card);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border-radius:var(--radius-sm);padding:11px 8px;text-align:center;border:1px solid var(--border)}
+.stats.stats-4{grid-template-columns:repeat(4,1fr)}
+.stat{background:var(--card);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border-radius:var(--radius-sm);padding:11px 8px;text-align:center;border:1px solid var(--border);transition:border-color .15s,background .15s}
+.stat.clickable{cursor:pointer}
+.stat.clickable:hover{border-color:var(--primary)}
+.stat.clickable.active{border-color:var(--primary);background:var(--primary-soft-bg)}
 .stat-val{font-size:1.25rem;font-weight:800}
 .stat-lbl{font-size:0.65rem;color:var(--muted);margin-top:2px}
 

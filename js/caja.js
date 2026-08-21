@@ -42,6 +42,23 @@ export async function deleteMovementsForProduct(productId, costIds = []) {
   results.forEach(r => { if (r.error) console.error('deleteMovementsForProduct', r.error); });
 }
 
+// Igual que deleteMovementsForProduct pero para una orden completa: borra
+// el abono más el de cada repuesto/gasto cargado, sin importar cuántos haya.
+export async function deleteMovementsForOrder(orderId, costIds = []) {
+  const tasks = [
+    supabase.from('caja_movimientos').delete()
+      .eq('source', 'order_deposit').eq('source_id', orderId)
+  ];
+  if (costIds.length) {
+    tasks.push(
+      supabase.from('caja_movimientos').delete()
+        .eq('source', 'order_cost').in('source_id', costIds)
+    );
+  }
+  const results = await Promise.all(tasks);
+  results.forEach(r => { if (r.error) console.error('deleteMovementsForOrder', r.error); });
+}
+
 let cache = [];
 let loaded = false; // si ya se trajo al menos una vez de la red
 let loading = null; // Promise del fetch en vuelo, o null
@@ -191,7 +208,7 @@ export async function genMonthlyReport() {
   const ingVentas = bySrc('entrada', ['product_sale', 'product_deposit']);
   const ingOtros = Math.max(0, entradas - ingReparaciones - ingVentas);
   const egCompras = bySrc('salida', ['product_buy']);
-  const egRepuestos = bySrc('salida', ['product_cost']);
+  const egRepuestos = bySrc('salida', ['product_cost', 'order_cost']);
   const egOtros = Math.max(0, salidas - egCompras - egRepuestos);
 
   // ── Operativo ─────────────────────────────────────────────────
