@@ -10,11 +10,20 @@ import { getCustomer, saveCustomer } from './customers.js';
 const SL = { ingresado: 'Ingresado', en_proceso: 'En proceso', terminado: 'Terminado', entregado: 'Entregado' };
 const SO = ['ingresado', 'en_proceso', 'terminado', 'entregado'];
 
+/** Fecha de hoy en horario local como YYYY-MM-DD. OJO: no usar
+ *  `new Date().toISOString().slice(0,10)` para esto — toISOString() da la
+ *  fecha en UTC, que en Argentina (UTC-3) ya cae en el día siguiente desde
+ *  las 21:00 hora local, adelantando "hoy" casi 3hs antes de tiempo. */
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 /** Terminado, con fecha límite de retiro cargada, y esa fecha ya pasó (y
  *  nadie lo retiró — si ya está entregado, dejó de importar). */
 function isOverdue(o) {
   if (o.status !== 'terminado' || !o.pickup_deadline) return false;
-  return o.pickup_deadline < new Date().toISOString().slice(0, 10);
+  return o.pickup_deadline < todayISO();
 }
 
 /** Formatea una columna `date` (YYYY-MM-DD, sin hora) a DD/MM/AA sin pasar

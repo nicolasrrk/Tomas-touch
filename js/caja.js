@@ -59,14 +59,43 @@ export async function deleteMovementsForOrder(orderId, costIds = []) {
   results.forEach(r => { if (r.error) console.error('deleteMovementsForOrder', r.error); });
 }
 
+// A qué pestaña pertenece cada movimiento: toda salida es un gasto, sin
+// excepción (incluye repuestos, compra de equipos, y hasta un ajuste/
+// devolución de un abono ya cargado) — "Órdenes" y "Ventas" quedan
+// reservadas para el dinero que efectivamente entró por cada canal. Con
+// este criterio, Gastos+Órdenes+Ventas+Otros siempre suma el total exacto
+// de movimientos, y coincide con los mismos baldes que ya usa el reporte
+// mensual (bySrc en genMonthlyReport): egCompras+egRepuestos+egOtros son,
+// en conjunto, toda salida — igual que acá.
+function movCategory(m) {
+  if (m.type === 'salida') return 'gastos';
+  if (m.source === 'order_deposit') return 'ordenes';
+  if (m.source === 'product_sale' || m.source === 'product_deposit') return 'ventas';
+  return ''; // entrada suelta, sin origen — solo se ve en "Todos"
+}
+
 let cache = [];
 let loaded = false; // si ya se trajo al menos una vez de la red
 let loading = null; // Promise del fetch en vuelo, o null
 let monthFilter = '';
+let categoryFilter = ''; // '' = todas — 'ordenes' | 'ventas' | 'gastos'
 
 /** Cambia el mes filtrado y vuelve a pintar (sin red: ya está todo en cache).
  *  No afecta el saldo disponible (es acumulado histórico, filtrarlo sería engañoso). */
 export function setMonthFilter(v) { monthFilter = v; paintCaja(); }
+
+/** Cambia la pestaña de categoría (Todos/Órdenes/Ventas/Gastos) y vuelve a
+ *  pintar. Igual que setOrdersTab/setKind: el estado visual de las
+ *  pestañas se actualiza acá mismo, no en paintCaja. */
+export function setCategoryFilter(cat) {
+  categoryFilter = cat;
+  document.querySelectorAll('#page-caja .subtab').forEach(x => {
+    const active = x.dataset.cat === cat;
+    x.classList.toggle('active', active);
+    x.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+  paintCaja();
+}
 
 async function fetchCaja() {
   const { data, error } = await supabase.from('caja_movimientos')
@@ -114,7 +143,8 @@ export function paintCaja() {
   animateStats(balEl);
 
   refreshMonthFilterOptions(document.getElementById('filterMonthCaja'), movs, 'created_at', monthFilter);
-  const scoped = movs.filter(m => matchesMonth(m, 'created_at', monthFilter));
+  const scoped = movs.filter(m => matchesMonth(m, 'created_at', monthFilter) &&
+    (!categoryFilter || movCategory(m) === categoryFilter));
   const ent = scoped.filter(m => m.type === 'entrada').reduce((s, m) => s + Number(m.amount), 0);
   const sal = scoped.filter(m => m.type === 'salida').reduce((s, m) => s + Number(m.amount), 0);
   const statsEl = document.getElementById('statsCaja');
