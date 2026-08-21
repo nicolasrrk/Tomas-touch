@@ -18,7 +18,8 @@ js/
   auth.js             → login/logout, sesión
   ui.js               → helpers: toasts, modal, formato de moneda/fecha, skeletons, parseo de montos
   storage.js           → subir/listar/borrar fotos (URLs firmadas, buckets privados)
-  orders.js            → módulo Órdenes: trabajos, abono/saldo, agrupado y filtrado por mes, PDF
+  orders.js            → módulo Órdenes: trabajos, repuestos/gastos y ganancia real, abono/saldo, directorio de clientes, fechas de retiro/garantía, filtrado por mes y estado, PDF con logo
+  customers.js          → directorio de clientes: ID cargado a mano que autocompleta Cliente/Teléfono/Dirección en Nueva Orden
   quotes.js             → módulo Presupuestos: ítems, PDF, "Convertir a Orden", filtrado por mes
   products.js          → módulo Nuevos/Usados: repuestos/gastos, abono/saldo, desglose de rentabilidad, filtrado por mes
   caja.js               → módulo Caja: movimientos filtrables por mes, saldo histórico, reporte mensual en PDF
@@ -34,7 +35,7 @@ Cada módulo de datos (`orders.js`, `quotes.js`, `products.js`, `caja.js`) separ
 
 Proyecto: **touch-servis** (org "Touch Servis", plan Free, región sa-east-1).
 
-- **Tablas**: `orders` (con `deposit`/`delivered_at`), `order_works`, `quotes` + `quote_items` (presupuestos), `products` (columna `kind`: `nuevo`/`usado`, con `deposit`/`sold_at`), `product_costs` (repuestos/gastos aplicados a un equipo), `caja_movimientos` (con `source`/`source_id` para enlazar movimientos con su origen), `settings` (vacía, para configuración futura).
+- **Tablas**: `orders` (con `deposit`/`delivered_at`/`terminado_at`, `address`/`customer_code`, `pickup_deadline`/`warranty_until`), `order_works`, `order_costs` (repuestos/gastos aplicados a una orden, para ver la ganancia real sin afectar el Total que ve el cliente), `quotes` + `quote_items` (presupuestos), `products` (columna `kind`: `nuevo`/`usado`, con `deposit`/`sold_at`), `product_costs` (repuestos/gastos aplicados a un equipo), `customers` (directorio de clientes: `code` cargado a mano como ID, `name`/`phone`/`address`), `caja_movimientos` (con `source`/`source_id` para enlazar movimientos con su origen), `settings` (vacía, para configuración futura).
 - **Triggers**: el total de `orders` y `quotes` se recalcula solo en la base (suma de `order_works`/`quote_items`) — no hay que pedirlo ni recalcularlo desde el cliente.
 - **Storage**: buckets privados `order-photos` y `product-photos`, organizados en carpetas por `id` del registro. Las imágenes se muestran con **URLs firmadas** de 1 hora (se regeneran cada vez que se abre el detalle).
 - **RLS (Row Level Security)**: todas las tablas y buckets solo permiten lectura/escritura a usuarios **autenticados**. No hay acceso público — toda la app queda detrás del login.
