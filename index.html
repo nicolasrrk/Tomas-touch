@@ -104,6 +104,12 @@
     <!-- CAJA -->
     <div class="page" id="page-caja">
       <div id="cajaBalance"></div>
+      <div class="subtabs" role="tablist" aria-label="Categoría de movimientos">
+        <button type="button" class="subtab active" data-cat="" role="tab" aria-selected="true" onclick="TS.setCajaCategory('')">Todos</button>
+        <button type="button" class="subtab" data-cat="ordenes" role="tab" aria-selected="false" onclick="TS.setCajaCategory('ordenes')">Órdenes</button>
+        <button type="button" class="subtab" data-cat="ventas" role="tab" aria-selected="false" onclick="TS.setCajaCategory('ventas')">Ventas</button>
+        <button type="button" class="subtab" data-cat="gastos" role="tab" aria-selected="false" onclick="TS.setCajaCategory('gastos')">Gastos</button>
+      </div>
       <div class="stats" id="statsCaja"></div>
       <div class="report-bar">
         <label class="sr-only" for="reportMonth">Mes del reporte</label>

@@ -91,7 +91,7 @@ window.TS = {
   addProductCost: Products.addProductCost, delProductCost: Products.delProductCost,
   updateProductDeposit: Products.updateProductDeposit, setProductsMonthFilter: Products.setMonthFilter,
   delMov: Caja.delMov, renderCaja: Caja.renderCaja, genMonthlyReport: Caja.genMonthlyReport,
-  setCajaMonthFilter: Caja.setMonthFilter,
+  setCajaMonthFilter: Caja.setMonthFilter, setCajaCategory: Caja.setCategoryFilter,
   logout: async () => { await logout(); toast('Sesión cerrada', 'info'); }
 };
 
@@ -102,7 +102,12 @@ document.getElementById('login-form').addEventListener('submit', handleLogin);
 document.getElementById('searchOrders').addEventListener('input', () => Orders.paintOrders());
 document.getElementById('searchQuotes').addEventListener('input', () => Quotes.paintQuotes());
 const reportMonthInput = document.getElementById('reportMonth');
-if (reportMonthInput) reportMonthInput.value = new Date().toISOString().slice(0, 7);
+if (reportMonthInput) {
+  // Fecha local, no UTC (toISOString() se adelanta de mes los últimos días
+  // de cada mes, desde las 21:00 hora Argentina).
+  const now = new Date();
+  reportMonthInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
 
 onAuthChange((session) => {
   showApp(!!session);
