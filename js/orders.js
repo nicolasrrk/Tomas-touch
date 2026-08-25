@@ -175,6 +175,11 @@ async function createOrder() {
   const client = document.getElementById('f-cl').value.trim();
   const phone = document.getElementById('f-ph').value.trim();
   const address = document.getElementById('f-dir').value.trim();
+  // orders.customer_code tiene foreign key a customers.code: si el código
+  // es nuevo, el cliente tiene que existir en el directorio ANTES de crear
+  // la orden, o el insert de abajo falla con "violates foreign key
+  // constraint orders_customer_code_fkey".
+  if (code) await saveCustomer({ code, name: client, phone, address }).catch(() => {});
   const payload = {
     client, phone, address,
     customer_code: code || null,
@@ -185,10 +190,6 @@ async function createOrder() {
   };
   const { error } = await supabase.from('orders').insert(payload);
   if (error) { toast('No se pudo crear la orden: ' + error.message, 'danger'); btn.disabled = false; btn.textContent = 'Crear Orden'; return; }
-  // Guarda/actualiza el directorio con lo último cargado, para que la
-  // próxima orden con este mismo ID ya venga completa. No bloquea el flujo
-  // si falla: la orden ya quedó creada.
-  if (code) saveCustomer({ code, name: client, phone, address }).catch(() => {});
   toast('Orden creada', 'success');
   closeModal(); renderOrders();
 }
@@ -327,12 +328,13 @@ export async function updateClientInfo(id) {
   const client = document.getElementById('e-cl').value.trim();
   const phone = document.getElementById('e-ph').value.trim();
   const address = document.getElementById('e-dir').value.trim();
+  // Igual que al crear: el cliente tiene que existir en el directorio antes
+  // de guardar el customer_code en la orden, por la foreign key.
+  if (code) await saveCustomer({ code, name: client, phone, address }).catch(() => {});
   const { error } = await supabase.from('orders').update({
     client, phone, address, customer_code: code || null
   }).eq('id', id);
   if (error) { toast('No se pudieron actualizar los datos', 'danger'); return; }
-  // Igual que al crear: si tiene ID, sincroniza el directorio con lo último.
-  if (code) saveCustomer({ code, name: client, phone, address }).catch(() => {});
   toast('Datos del cliente actualizados', 'success');
   viewOrder(id); renderOrders();
 }
