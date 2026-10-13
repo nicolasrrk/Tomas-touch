@@ -236,16 +236,6 @@ export async function viewOrder(id) {
     <div class="form-group"><label for="e-warranty">Vencimiento de garantía</label><input id="e-warranty" type="date" value="${o.warranty_until || ''}"></div>
     <button class="btn btn-ghost btn-sm" onclick="TS.updateWarranty('${o.id}')">Actualizar</button>` : ''}
 
-    <div class="sec-title">Trabajos realizados</div>
-    <div id="works-list">${renderWorks(works)}</div>
-    <div class="row mt-8">
-      <label class="sr-only" for="w-d">Descripción del trabajo</label>
-      <input id="w-d" placeholder="Descripción del trabajo" style="flex:2">
-      <label class="sr-only" for="w-c">Costo</label>
-      <input id="w-c" type="number" inputmode="decimal" placeholder="$" style="flex:1">
-      <button class="btn btn-primary btn-sm" aria-label="Agregar trabajo" onclick="TS.addWork('${o.id}')">+</button>
-    </div>
-
     <div class="detail-row mt-12" style="border-top:1px solid var(--border);padding-top:12px">
       <span class="fw-700">Total</span>
       <span class="t-success fw-700 num" style="font-size:1.1rem">${$M(o.cost)}</span>
