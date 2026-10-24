@@ -45,6 +45,60 @@ let statusFilter = ''; // '' = todos los estados
 // se guarda al abrir el detalle y se reutiliza (igual que en products.js).
 let viewedOrder = { id: null, device: null };
 
+const INTAKE_MARKER = '__TOUCH_SERVIS_INGRESO__';
+const INTAKE_CHECKS = [
+  'Enciende', 'Mojado / Humedad', 'Pantalla astillada', 'Pantalla rota',
+  'Tapa trasera rota', 'Carga batería', 'Cámara frontal', 'Cámara trasera',
+  'Parlante superior', 'Parlante inferior', 'Conexión Wi-Fi / 4G / 5G',
+  'Conexión de datos 4G / 5G', 'Botones (Vol / Pwr)'
+];
+
+function intakeFromNotes(notes) {
+  if (!notes?.startsWith(INTAKE_MARKER)) return null;
+  try { return JSON.parse(notes.slice(INTAKE_MARKER.length)); } catch { return null; }
+}
+
+function intakeNotes(intake) { return INTAKE_MARKER + JSON.stringify(intake); }
+
+function collectIntake() {
+  return {
+    dni: document.getElementById('f-dni').value.trim(),
+    access: document.getElementById('f-access').value.trim(),
+    type: document.getElementById('f-type').value,
+    checks: [...document.querySelectorAll('.intake-check:checked')].map(input => input.value),
+    signature: window.orderSignature || []
+  };
+}
+
+function initSignaturePad() {
+  const canvas = document.getElementById('f-signature');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let drawing = false, current = null;
+  window.orderSignature = [];
+  const point = event => {
+    const rect = canvas.getBoundingClientRect();
+    return { x: (event.clientX - rect.left) / rect.width, y: (event.clientY - rect.top) / rect.height };
+  };
+  const redraw = () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = 2.2; ctx.strokeStyle = '#dbeafe';
+    window.orderSignature.forEach(stroke => {
+      if (!stroke.length) return;
+      ctx.beginPath();
+      stroke.forEach((p, i) => i ? ctx.lineTo(p.x * canvas.width, p.y * canvas.height) : ctx.moveTo(p.x * canvas.width, p.y * canvas.height));
+      ctx.stroke();
+    });
+  };
+  canvas.addEventListener('pointerdown', event => {
+    drawing = true; canvas.setPointerCapture(event.pointerId);
+    current = [point(event)]; window.orderSignature.push(current); redraw();
+  });
+  canvas.addEventListener('pointermove', event => { if (!drawing) return; current.push(point(event)); redraw(); });
+  canvas.addEventListener('pointerup', () => { drawing = false; current = null; });
+  document.getElementById('clear-signature').addEventListener('click', () => { window.orderSignature = []; redraw(); });
+}
+
 /** Cambia el mes filtrado y vuelve a pintar (sin red: ya está todo en cache). */
 export function setMonthFilter(v) { monthFilter = v; paintOrders(); }
 
@@ -146,10 +200,25 @@ export function newOrderModal() {
     <div class="form-group"><label for="f-dir">Dirección</label><input id="f-dir" placeholder="Dirección del cliente"></div>
     <div class="form-group"><label for="f-dv">Dispositivo</label><input id="f-dv" placeholder="Ej: Samsung A54 Negro"></div>
     <div class="form-group"><label for="f-pr">Problema reportado</label><textarea id="f-pr" placeholder="Describe el problema que trae el equipo…"></textarea></div>
-    <div class="form-group"><label for="f-co">Costo estimado ($)</label><input id="f-co" type="number" inputmode="decimal" placeholder="0"></div>
+    <div class="grid-2">
+      <div class="form-group"><label for="f-dni">DNI</label><input id="f-dni" inputmode="numeric" placeholder="DNI del cliente"></div>
+      <div class="form-group"><label for="f-access">Contraseña / patrón / PIN</label><input id="f-access" placeholder="Opcional"></div>
+    </div>
+    <div class="sec-title">Revisión inicial y accesorios</div>
+    <div class="intake-checks">${INTAKE_CHECKS.map(item => `<label class="intake-check"><input type="checkbox" value="${item}"><span>${item}</span></label>`).join('')}</div>
+    <div class="form-group mt-12"><label for="f-type">Tipo de ingreso</label><select id="f-type"><option value="cliente">Cliente particular</option><option value="colega">Colega / gremio</option></select></div>
+    <div class="sec-title">Firma del cliente</div>
+    <div class="signature-wrap"><canvas id="f-signature" width="680" height="220" aria-label="Área para firma táctil"></canvas><span>Firmar con el dedo o lápiz</span></div>
+    <button type="button" class="btn btn-ghost btn-sm mt-8" id="clear-signature">Limpiar firma</button>
+    <div class="grid-2 mt-12">
+      <div class="form-group"><label for="f-co">Costo estimado ($)</label><input id="f-co" type="number" inputmode="decimal" placeholder="0"></div>
+      <div class="form-group"><label for="f-dep">Seña / adelanto ($)</label><input id="f-dep" type="number" inputmode="decimal" placeholder="0"></div>
+    </div>
+    <label class="print-option"><input id="f-print" type="checkbox" checked><span>Crear e imprimir comprobante PDF</span></label>
     <button class="btn btn-primary btn-full mt-12" id="btn-create-order">Crear Orden</button>`;
   document.getElementById('f-id').addEventListener('blur', fillFromCustomer);
   document.getElementById('btn-create-order').addEventListener('click', createOrder);
+  initSignaturePad();
   openModal();
 }
 
@@ -175,6 +244,7 @@ async function createOrder() {
   const client = document.getElementById('f-cl').value.trim();
   const phone = document.getElementById('f-ph').value.trim();
   const address = document.getElementById('f-dir').value.trim();
+  const deposit = amountFromInput('f-dep');
   // orders.customer_code tiene foreign key a customers.code: si el código
   // es nuevo, el cliente tiene que existir en el directorio ANTES de crear
   // la orden, o el insert de abajo falla con "violates foreign key
@@ -186,11 +256,16 @@ async function createOrder() {
     device: dv,
     problem: document.getElementById('f-pr').value.trim(),
     cost: amountFromInput('f-co'),
+    deposit,
+    notes: intakeNotes(collectIntake()),
     status: 'ingresado'
   };
-  const { error } = await supabase.from('orders').insert(payload);
+  const { data: created, error } = await supabase.from('orders').insert(payload).select('id, device').single();
   if (error) { toast('No se pudo crear la orden: ' + error.message, 'danger'); btn.disabled = false; btn.textContent = 'Crear Orden'; return; }
+  if (deposit) await cajaPush('entrada', `Abono orden: ${created.device}`, deposit, 'order_deposit', created.id);
+  const shouldPrint = document.getElementById('f-print').checked;
   toast('Orden creada', 'success');
+  if (shouldPrint) await genPDF(created.id);
   closeModal(); renderOrders();
 }
 
@@ -469,6 +544,53 @@ async function loadLogo() {
   return logoDataUrl;
 }
 
+function pdfRoom(doc, y, height, margin = 20) {
+  if (y + height <= 277) return y;
+  doc.addPage();
+  return margin;
+}
+
+function drawSignature(doc, signature, x, y, w, h) {
+  doc.setDrawColor(148, 163, 184); doc.setLineWidth(0.35); doc.roundedRect(x, y, w, h, 2, 2);
+  if (!signature?.length) return;
+  doc.setDrawColor(15, 23, 42); doc.setLineWidth(0.7);
+  signature.forEach(stroke => {
+    if (stroke.length < 2) return;
+    for (let i = 1; i < stroke.length; i++) {
+      const a = stroke[i - 1], b = stroke[i];
+      doc.line(x + a.x * w, y + a.y * h, x + b.x * w, y + b.y * h);
+    }
+  });
+}
+
+function drawTermsPage(doc, intake) {
+  const W = 210, M = 16;
+  doc.addPage();
+  doc.setFillColor(0, 0, 0); doc.rect(0, 0, W, 25, 'F');
+  doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
+  doc.text('CONDICIONES DEL SERVICIO TÉCNICO', M, 16);
+  let y = 35;
+  const clauses = [
+    ['Revisión y fallas ocultas', 'Equipos apagados o sin clave se reciben bajo reserva funcional. No respondemos por fallas previas no declaradas o no comprobables al ingreso.'],
+    ['Datos e información', 'El cliente es responsable de su copia de seguridad (backup). El taller no se responsabiliza por la pérdida de fotos, contactos o archivos.'],
+    ['Equipos mojados o golpeados', 'Las reparaciones de equipos con humedad o sulfato no tienen garantía debido a la corrosión progresiva. Equipos con trizaduras previas se manipulan bajo riesgo del cliente.'],
+    ['Garantía y elección de calidad de repuesto', 'La garantía de 30 días aplica únicamente a repuestos recomendados por el servicio técnico (calidad original / premium). Si el cliente elige una opción genérica o alternativa, dicho repuesto no cuenta con garantía. La garantía se anula por golpes, caídas, humedad, sellos rotos o apertura por terceros.'],
+    ['Retiro y abandono', 'Plazo máximo de retiro: 30 días desde la notificación. Cumplido dicho plazo, se cobrará costo de depósito o el equipo se considerará en abandono para cubrir costos incurridos.'],
+    ['Entrega', 'Es obligatorio presentar la orden de servicio original para retirar el equipo.']
+  ];
+  if (intake?.type === 'colega') clauses.push(
+    ['Aviso a colegas · Responsabilidad sobre repuestos', 'La provisión del repuesto queda a cargo del colega al ingresar el dispositivo o una vez confirmado el diagnóstico. Cualquier falla de fábrica, defecto, rotura o mal funcionamiento ante su cliente final es exclusiva responsabilidad del colega. El laboratorio responde únicamente por la mano de obra.'],
+    ['Aviso a colegas · Diagnóstico, pago y retiro', 'El diagnóstico técnico implica tiempo de laboratorio. Si el presupuesto se rechaza o no se concreta el trabajo, el diagnóstico tendrá un costo de revisión. El pago es al contado y al retirar el equipo; no se entrega contra entrega al cliente final ni se espera a que el colega cobre su trabajo.']
+  );
+  clauses.forEach(([title, body]) => {
+    doc.setTextColor(15, 23, 42); doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.text(title, M, y); y += 4.5;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.3); doc.setTextColor(71, 85, 105);
+    const lines = doc.splitTextToSize(body, W - M * 2); doc.text(lines, M, y); y += lines.length * 4 + 7;
+  });
+  doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+  doc.text('La firma incluida en la orden acredita la aceptación de estas condiciones.', W / 2, 286, { align: 'center' });
+}
+
 // ── PDF ───────────────────────────────────────────────────────
 export async function genPDF(id) {
   const [{ data: o }, logo] = await Promise.all([
@@ -478,6 +600,8 @@ export async function genPDF(id) {
   ]);
   if (!o) return;
   const works = o.order_works || [];
+  const intake = intakeFromNotes(o.notes);
+  const plainNotes = intake ? '' : o.notes;
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const W = 210, M = 20; let y = M;
@@ -546,7 +670,28 @@ export async function genPDF(id) {
   const pLines = doc.splitTextToSize(o.problem || 'Sin descripción', W - M * 2);
   doc.text(pLines, M, y); y += pLines.length * 5 + 10;
 
+  if (intake) {
+    y = pdfRoom(doc, y, 62, M);
+    doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+    doc.text('REVISIÓN INICIAL Y ACCESORIOS', M, y); y += 6;
+    const checks = intake.checks?.length ? intake.checks.map(item => '[x] ' + item) : ['Sin observaciones marcadas'];
+    const columns = 2, colW = (W - M * 2 - 10) / columns;
+    const boxH = Math.max(18, Math.ceil(checks.length / columns) * 5.5 + 8);
+    doc.setFillColor(248, 250, 252); doc.roundedRect(M, y, W - M * 2, boxH, 2, 2, 'F');
+    doc.setTextColor(15, 23, 42); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+    checks.forEach((item, index) => {
+      const col = index % columns, row = Math.floor(index / columns);
+      doc.text(item, M + 5 + col * colW, y + 6 + row * 5.5);
+    });
+    y += boxH + 6;
+    const access = intake.access ? `Contraseña / patrón / PIN: ${intake.access}` : 'Contraseña / patrón / PIN: no informado';
+    const dni = intake.dni ? `DNI: ${intake.dni}` : 'DNI: no informado';
+    doc.setTextColor(71, 85, 105); doc.setFontSize(8.5);
+    doc.text(dni, M, y); doc.text(access, W / 2 + 2, y); y += 9;
+  }
+
   if (works && works.length) {
+    y = pdfRoom(doc, y, 25, M);
     doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
     doc.text('TRABAJOS REALIZADOS', M, y); y += 5;
     doc.setFillColor(0, 0, 0); doc.rect(M, y, W - M * 2, 7, 'F');
@@ -560,20 +705,29 @@ export async function genPDF(id) {
     }); y += 4;
   }
 
+  y = pdfRoom(doc, y, 24, M);
+  const pending = Math.max(0, Number(o.cost || 0) - Number(o.deposit || 0));
   doc.setFillColor(47, 123, 255); doc.roundedRect(M, y, W - M * 2, 14, 3, 3, 'F');
   doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
-  doc.text('TOTAL', M + 6, y + 9.5); doc.text($M(o.cost), W - M - 6, y + 9.5, { align: 'right' }); y += 22;
+  doc.text('PRESUPUESTO', M + 6, y + 9.5); doc.text($M(o.cost), W - M - 6, y + 9.5, { align: 'right' }); y += 20;
+  doc.setTextColor(71, 85, 105); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+  doc.text(`Seña / adelanto: ${$M(o.deposit)}`, M, y); doc.text(`Saldo pendiente: ${$M(pending)}`, W - M, y, { align: 'right' }); y += 10;
 
-  if (o.notes) {
+  if (intake) {
+    y = pdfRoom(doc, y, 36, M);
+    doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+    doc.text('FIRMA DEL CLIENTE Y CONSENTIMIENTO', M, y); y += 4;
+    drawSignature(doc, intake.signature, M, y, W - M * 2, 24); y += 32;
+  }
+
+  if (plainNotes) {
     doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
     doc.text('NOTAS', M, y); y += 5;
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(15, 23, 42);
-    doc.text(doc.splitTextToSize(o.notes, W - M * 2), M, y);
+    doc.text(doc.splitTextToSize(plainNotes, W - M * 2), M, y);
   }
 
-  doc.setFontSize(8); doc.setTextColor(148, 163, 184); doc.setFont('helvetica', 'normal');
-  doc.text('Gracias por confiar en Touch Servis · Este documento es el comprobante oficial de su equipo.', W / 2, 286, { align: 'center' });
-  doc.line(M, 282, W - M, 282);
+  drawTermsPage(doc, intake);
 
   doc.save(`TouchServis_Orden_${o.id.slice(-6).toUpperCase()}.pdf`);
 }

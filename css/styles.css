@@ -162,6 +162,16 @@ select option{background:var(--card-solid)}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
+/* ── Ficha de ingreso ─────────────────────────────────────────── */
+.intake-checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.intake-check{display:flex;align-items:center;gap:8px;margin:0;padding:9px 8px;border:1px solid var(--border-solid);border-radius:8px;background:var(--card2);color:var(--text);font-size:.76rem;line-height:1.25;font-weight:500;cursor:pointer}
+.intake-check input,.print-option input{width:17px;height:17px;flex:0 0 auto;accent-color:var(--primary);padding:0}
+.signature-wrap{border:1px dashed var(--primary);border-radius:10px;background:var(--card2);overflow:hidden}
+.signature-wrap canvas{display:block;width:100%;height:130px;touch-action:none;cursor:crosshair}
+.signature-wrap span{display:block;padding:6px 10px;border-top:1px solid var(--border-solid);color:var(--muted);font-size:.72rem}
+.print-option{display:flex;align-items:center;gap:9px;margin:4px 0 0;color:var(--text);font-size:.82rem;cursor:pointer}
+@media(max-width:390px){.intake-checks{grid-template-columns:1fr}.grid-2{grid-template-columns:1fr}}
+
 /* ── Modal: tarjeta flotante centrada (no bottom-sheet) ──────────── */
 .overlay{
   position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);
