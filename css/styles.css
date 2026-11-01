@@ -164,8 +164,15 @@ select option{background:var(--card-solid)}
 
 /* ── Ficha de ingreso ─────────────────────────────────────────── */
 .intake-checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
-.intake-check{display:flex;align-items:center;gap:8px;margin:0;padding:9px 8px;border:1px solid var(--border-solid);border-radius:8px;background:var(--card2);color:var(--text);font-size:.76rem;line-height:1.25;font-weight:500;cursor:pointer}
-.intake-check input,.print-option input{width:17px;height:17px;flex:0 0 auto;accent-color:var(--primary);padding:0}
+.intake-check{min-width:0;margin:0;padding:9px 8px 8px;border:1px solid var(--border-solid);border-radius:8px;background:var(--card2);color:var(--text)}
+.intake-check legend{padding:0;margin:0 0 7px;font-size:.76rem;line-height:1.25;font-weight:600;color:var(--text)}
+.intake-options{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.intake-options label{position:relative;margin:0;display:block;cursor:pointer}
+.intake-options input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.intake-options span{display:block;padding:6px 3px;border:1px solid var(--border-solid);border-radius:6px;color:var(--muted);font-size:.67rem;text-align:center;font-weight:700;transition:all .15s}
+.intake-options input:checked + span{color:#fff;border-color:var(--primary);background:var(--primary)}
+.intake-options input:focus-visible + span{outline:2px solid var(--primary);outline-offset:2px}
+.print-option input{width:17px;height:17px;flex:0 0 auto;accent-color:var(--primary);padding:0}
 .signature-wrap{border:1px dashed var(--primary);border-radius:10px;background:var(--card2);overflow:hidden}
 .signature-wrap canvas{display:block;width:100%;height:130px;touch-action:none;cursor:crosshair}
 .signature-wrap span{display:block;padding:6px 10px;border-top:1px solid var(--border-solid);color:var(--muted);font-size:.72rem}

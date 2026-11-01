@@ -65,7 +65,10 @@ function collectIntake() {
     dni: document.getElementById('f-dni').value.trim(),
     access: document.getElementById('f-access').value.trim(),
     type: document.getElementById('f-type').value,
-    checks: [...document.querySelectorAll('.intake-check:checked')].map(input => input.value),
+    checks: [...document.querySelectorAll('.intake-status:checked')].map(input => ({
+      item: input.dataset.item,
+      status: input.value
+    })),
     signature: window.orderSignature || []
   };
 }
@@ -205,7 +208,14 @@ export function newOrderModal() {
       <div class="form-group"><label for="f-access">Contraseña / patrón / PIN</label><input id="f-access" placeholder="Opcional"></div>
     </div>
     <div class="sec-title">Revisión inicial y accesorios</div>
-    <div class="intake-checks">${INTAKE_CHECKS.map(item => `<label class="intake-check"><input type="checkbox" value="${item}"><span>${item}</span></label>`).join('')}</div>
+    <div class="intake-checks">${INTAKE_CHECKS.map((item, index) => `
+      <fieldset class="intake-check">
+        <legend>${item}</legend>
+        <div class="intake-options">
+          <label><input class="intake-status" type="radio" name="intake-${index}" value="Funciona" data-item="${item}"><span>Funciona</span></label>
+          <label><input class="intake-status" type="radio" name="intake-${index}" value="No funciona" data-item="${item}"><span>No funciona</span></label>
+        </div>
+      </fieldset>`).join('')}</div>
     <div class="form-group mt-12"><label for="f-type">Tipo de ingreso</label><select id="f-type"><option value="cliente">Cliente particular</option><option value="colega">Colega / gremio</option></select></div>
     <div class="sec-title">Firma del cliente</div>
     <div class="signature-wrap"><canvas id="f-signature" width="680" height="220" aria-label="Área para firma táctil"></canvas><span>Firmar con el dedo o lápiz</span></div>
@@ -674,7 +684,9 @@ export async function genPDF(id) {
     y = pdfRoom(doc, y, 62, M);
     doc.setTextColor(100, 116, 139); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
     doc.text('REVISIÓN INICIAL Y ACCESORIOS', M, y); y += 6;
-    const checks = intake.checks?.length ? intake.checks.map(item => '[x] ' + item) : ['Sin observaciones marcadas'];
+    const checks = intake.checks?.length
+      ? intake.checks.map(check => typeof check === 'string' ? '[x] ' + check : `[${check.status === 'Funciona' ? 'SI' : 'NO'}] ${check.item}`)
+      : ['Sin revisión marcada'];
     const columns = 2, colW = (W - M * 2 - 10) / columns;
     const boxH = Math.max(18, Math.ceil(checks.length / columns) * 5.5 + 8);
     doc.setFillColor(248, 250, 252); doc.roundedRect(M, y, W - M * 2, boxH, 2, 2, 'F');
